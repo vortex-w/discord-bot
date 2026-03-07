@@ -1,0 +1,16 @@
+
+module.exports = [
+    {
+        name: 'adminping',
+        description: 'Admin ping teszt',
+        permissionLevel: 'admin',
+
+        async prefix(message, args) {
+            await message.reply('admin pong');
+        },
+
+        async slash(interaction) {
+            await interaction.reply('admin pong');
+        }
+    }
+];

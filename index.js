@@ -2,11 +2,11 @@
 //teszt elem V6
 require('dotenv').config();
 
-const {Client, GatewayIntentBits, Collection} = require('discord.js');
-const {canUseLevel, getNoPermissionMessage} = require('./utilis/permissions');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
 
 const client = new Client({
-    intents:[
+    intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
@@ -14,6 +14,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+
 const publicCommands = require('./commands/public/commands');
 const modCommands = require('./commands/mod/commands');
 const adminCommands = require('./commands/admin/commands');
@@ -24,68 +25,76 @@ const allCommands = [
     ...modCommands,
     ...adminCommands,
     ...ownerCommands
-]
+];
 
-for (const command of allCommands){
-    if(!command.name){
+for (const command of allCommands) {
+    if (!command.name) {
         console.log('Találtam egy hibás parancsot, nincs name mező.');
         continue;
     }
+
     client.commands.set(command.name, command);
 }
 
-client.once ('clientReady', () =>{
+client.once('clientReady', () => {
     console.log(`Bot elindult: ${client.user.tag}`);
 });
-client.on('messageCreate' , async(message) =>{
-    try{
-        if(message.author.bot) return;
-        if(!message.guild) return;
-        if(!message.content.startsWith('!')) return;
+
+client.on('messageCreate', async (message) => {
+    try {
+        if (message.author.bot) return;
+        if (!message.guild) return;
+        if (!message.content.startsWith('!')) return;
+
         const args = message.content.slice(1).trim().split(/\s+/);
-        const CommandName = args.shift()?.toLowerCase();
+        const commandName = args.shift()?.toLowerCase();
 
-        if(!CommandName) return;
+        if (!commandName) return;
 
-        const command = client.commands.get(CommandName);
-        if(!command){
-            await message.reply(`Ismeretlen parancsot adtál meg: ${CommandName}`);
+        const command = client.commands.get(commandName);
+
+        if (!command) {
+            await message.reply(`Ismeretlen parancsot adtál meg: ${commandName}`);
             return;
         }
 
         const permissionLevel = command.permissionLevel || 'public';
 
-        if(!canUseLevel(message.member, permissionLevel)){
+        if (!canUseLevel(message.member, permissionLevel)) {
             await message.reply(getNoPermissionMessage(permissionLevel));
             return;
         }
 
-        if(typeof command.prefix === 'function'){
-            await command.prefix(message, args);
+        if (typeof command.prefix === 'function') {
+            await command.prefix(message, args, client);
         }
-    }catch(error){
-        console.error("Hiba a messageCreate eseménynél:", error);
+    } catch (error) {
+        console.error('Hiba a messageCreate eseménynél:', error);
     }
 });
 
 client.on('interactionCreate', async (interaction) => {
-    try{
-        if(!interaction.isChatInputCommand()) return;
-        if(!interaction.guild) return;
+    try {
+        if (!interaction.isChatInputCommand()) return;
+        if (!interaction.guild) return;
+
         const command = client.commands.get(interaction.commandName);
-        if(!command) return;
+        if (!command) return;
+
         const permissionLevel = command.permissionLevel || 'public';
-        if(!canUseLevel(interaction.member, permissionLevel)){
+
+        if (!canUseLevel(interaction.member, permissionLevel)) {
             await interaction.reply({
                 content: getNoPermissionMessage(permissionLevel),
-                ephemeral : true
+                ephemeral: true
             });
             return;
         }
+
         if (typeof command.slash === 'function') {
-            await command.slash(interaction);
+            await command.slash(interaction, client);
         }
-    }catch (error) {
+    } catch (error) {
         console.error('Hiba az interactionCreate eseménynél:', error);
 
         if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
@@ -96,4 +105,5 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 });
+
 client.login(process.env.DISCORD_TOKEN);

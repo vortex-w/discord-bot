@@ -60,7 +60,7 @@ function canUseLevel(member, level = 'public'){
     }
 }
 
-function getNoPermissionMessage(level = 'publick'){
+function getNoPermissionMessage(level = 'public'){
     switch(level){
         case 'owner':
             return 'Ehhez a parancshoz csak a bot tulajdonosa vagy a szerver tulajdonosa férhet hozzá!';

@@ -1,12 +1,54 @@
 
-const {isOwner, isAdmin, isMod} = require('../../utilis/permissions');
+const { group } = require('node:console');
+const {isOwner, isAdmin, isMod, canUseLevel} = require('../../utilis/permissions');
+const { describe } = require('node:test');
 
 
 function getUserLevel(member) {
+    if(!member || !member.guild) return 'PUBLIC';
     if (isOwner(member.guild, member.id)) return 'OWNER';
     if (isAdmin(member)) return 'ADMIN';
     if (isMod(member)) return 'MOD';
     return 'PUBLIC';
+}
+
+function buildCommandsMessage(member, allCommands){
+    const level = getUserLevel(member);
+    const groupedCommands = {
+        public: [],
+        mod: [],
+        admin: [],
+        owner: []
+    };
+    for (const command of allCommands.values()){
+        if(!canUseLevel(member, command.permissionLevel)) continue;
+        const category = (command.permissionLevel || 'public').toLowerCase();
+        if(!groupedCommands[category]){
+            groupedCommands[category] = [];
+        }
+        groupedCommands[category].push(`!${command.name} - ${command.description}`);
+    }
+    let text = `A jogosultsági szinted: *${level}** \n\n`;
+    text += `Használható parancsok:\n`;
+    if(groupedCommands.public.length){
+        text += `\n**PUBLIC**\n${groupedCommands.public.join('\n')}\n`;
+    }
+     if (groupedCommands.public.length) {
+        text += `\n**PUBLIC**\n${groupedCommands.public.join('\n')}\n`;
+    }
+
+    if (groupedCommands.mod.length) {
+        text += `\n**MOD**\n${groupedCommands.mod.join('\n')}\n`;
+    }
+
+    if (groupedCommands.admin.length) {
+        text += `\n**ADMIN**\n${groupedCommands.admin.join('\n')}\n`;
+    }
+
+    if (groupedCommands.owner.length) {
+        text += `\n**OWNER**\n${groupedCommands.owner.join('\n')}\n`;
+    }
+    return text.trim();
 }
 
 module.exports = [
@@ -35,6 +77,20 @@ module.exports = [
         async slash(interaction) {
             const level = getUserLevel(interaction.member);
             await interaction.reply(`A jogosultsági szinted: **${level}**`);
+        }
+    },
+    {
+        name:'commands',
+        description: 'Ki listázza a használható parancsokat',
+        permissionLevel : 'public',
+
+        async prefix(message,args,client){
+            const text = buildCommandsMessage(message.member, client.commands);
+            await message.reply(text);
+        },
+        async slash(interaction, client){
+            const text = buildCommandsMessage(interaction.member, client.commands);
+            await interaction.reply(text);
         }
     }
 ];

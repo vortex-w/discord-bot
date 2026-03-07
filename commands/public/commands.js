@@ -2,6 +2,8 @@
 const { group } = require('node:console');
 const {isOwner, isAdmin, isMod, canUseLevel} = require('../../utilis/permissions');
 const { describe } = require('node:test');
+const { getUserById} = require('../../database/queries/users');
+const { getGuildById} = require('../../database/queries/guilds');
 
 
 function getUserLevel(member) {
@@ -91,6 +93,43 @@ module.exports = [
         async slash(interaction, client){
             const text = buildCommandsMessage(interaction.member, client.commands);
             await interaction.reply(text);
+        }
+    },
+    {
+        name :'mydb',
+        description: 'megmutatja az adatbázisban tárolt adataidat',
+        permissionLevel: 'public',
+
+        async prefix(message,args){
+            try{
+                const user = await getUserById(message.author.id);
+                const guild = await getGuildById(message.guild.id);
+
+                if(!user){
+                    await message.reply('Nem talltam a user adatait az adatbázisban.');
+                    return;
+                }
+
+                await message.reply(
+                    `Felhasználó:\n`+
+                    `ID: ${user.user_id}\n`+
+                    `Név: ${user.username}\n` + 
+                    `Globális név: ${user.global_name || 'nincs'} \n\n`+
+                    `Szerver: \n` +
+                    `ID: ${guild?.guild_id || 'nincs'} \n`+
+                    `Név: ${guid?.guild_name || 'nincs'}\n`+
+                    `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`
+                );
+            }catch (error){
+                console.error('mydb hiba:', error);
+                await message.reply('Hiba Történt az adatbázis lekérdezéáse közben!');
+            }
+        },
+        async slash(interaction){
+            await interaction.reply({
+                ccontent: 'A slash verzió még nincs bekötve ehhez a arancshoz.',
+                ephemeral: true
+            });
         }
     }
 ];

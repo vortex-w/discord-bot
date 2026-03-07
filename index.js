@@ -1,9 +1,12 @@
 //V5 verzó asdasd
 //teszt elem V6
-require('dotenv').config();
+ require('dotenv').config();
 
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
+const {initDatabase} = require('./database/init');
+const {saveUser} = require('./database/queries/users');
+const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
 const kopapirollo = require('./game/kopapirollo');
 
 const client = new Client({
@@ -37,14 +40,27 @@ for (const command of allCommands) {
     client.commands.set(command.name, command);
 }
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
     console.log(`Bot elindult: ${client.user.tag}`);
+    try{
+        await initDatabase();
+    }catch(error){
+        console.error('adatbázis inicializási hiba:' , error);
+    }
 });
 
 client.on('messageCreate', async (message) => {
     try {
+        
         if (message.author.bot) return;
         if (!message.guild) return;
+        try{
+            await saveGuildUser(message.author);
+            await saveGuild(message.guild);
+            await saveGuildUser(message.guild.id, message.author.id);
+        }catch(dbError){
+            console.error('Automatikus user/guil mentési hiba:', dbError);
+        }
         if(await kopapirollo(message,client)) return;
         if (!message.content.startsWith('!')) return;
 
@@ -79,7 +95,7 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isChatInputCommand()) return;
         if (!interaction.guild) return;
-
+        
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
 

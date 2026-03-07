@@ -80,7 +80,7 @@ module.exports = [
         }
     },
     {
-        name:'commands',
+        name:'parancsok',
         description: 'Ki listázza a használható parancsokat',
         permissionLevel : 'public',
 

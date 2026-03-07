@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
+const kopapirollo = require('./game/kopapirollo');
 
 const client = new Client({
     intents: [
@@ -44,6 +45,7 @@ client.on('messageCreate', async (message) => {
     try {
         if (message.author.bot) return;
         if (!message.guild) return;
+        if(await kopapirollo(message,client)) return;
         if (!message.content.startsWith('!')) return;
 
         const args = message.content.slice(1).trim().split(/\s+/);

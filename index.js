@@ -1,5 +1,5 @@
 //V5 verzó asdasd
-//teszt elem
+//teszt elem V6
 require('dotenv').config();
 
 const {Client, GatewayIntentBits, Collection} = require('discord.js');

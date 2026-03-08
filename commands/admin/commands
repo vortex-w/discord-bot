@@ -45,14 +45,37 @@ module.exports = [
         permissionLevel: 'admin',
         async prefix(message, args){
             //console.log("itt vagyunk");
+            let start = "";
+            let start_time ="";
+            let end = "";
+            let end_time = "";
             if(!args[0]){
                 await message.reply("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
                 return;
             }
-            let start = args[0];
-            let start_time = args[1];
-            let end = args[2] || args[0];
-            let end_time = args[2];
+            if(!args[1]){
+                start = args[0];
+                start = start + " 00:00:00";
+                end = args[0];
+                end = end + " 23:59:59";
+            }else if(!args[2]){
+                start = args[0];
+                start = start + " " + args[1];
+                end = args[0];
+                end = end + " 23:59:59";
+            }
+            else if(!args[3]){
+                start = args[0];
+                start = start + " " + args[1];
+                end = args[2];
+                end = end + " 23:59:59";
+            }else {
+                start = args[0];
+                start = start + " " + args[1];
+                end = args[2];
+                end = end + " " + args[3];
+            }
+            console.log(args[0],args[1],args[2],args[3]);
             //console.log(start.length);
             
             start = start + " 00:00:00";    

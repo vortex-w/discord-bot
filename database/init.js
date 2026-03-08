@@ -5,8 +5,8 @@ async function initDatabase(){
                 user_id TEXT PRIMARY KEY,
                 username TEXT NOT NULL,
                 global_name TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
             )
         `);
 
@@ -15,8 +15,8 @@ async function initDatabase(){
                     guild_id TEXT PRIMARY KEY,
                     guild_name TEXT NOT NULL,
                     owner_id TEXT NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                    updated_at TEXT DEFAULT (datetime('now', 'localtime'))
                 )
             `);
         await run(`
@@ -24,7 +24,7 @@ async function initDatabase(){
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     guild_id TEXT NOT NULL,
                     user_id TEXT NOT NULL,
-                    joined_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    joined_at TEXT DEFAULT (datetime('now', 'localtime')),
                     UNIQUE(guild_id, user_id)
                 )
             `);
@@ -38,7 +38,7 @@ async function initDatabase(){
                 user_name,
                 guild_id ,
                 guild_name,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
                 )
             `);
             console.log('SQLite táblák létrehozva, vagy már léteznek');

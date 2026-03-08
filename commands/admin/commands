@@ -44,17 +44,22 @@ module.exports = [
         description: 'Dátumon belül ki listáza a log eredményeit.',
         permissionLevel: 'admin',
         async prefix(message, args){
+            //console.log("itt vagyunk");
             if(!args[0]){
-                await message.reply("Használat: !loglist 2026-03-08 vagy !logs 2026-03-07 2026-03-08");
+                await message.reply("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
                 return;
             }
             let start = args[0];
-            let end = args[1] || args[0];
-            start = start + "00:00:00";
-            end = end + "23:59:59";
+            let start_time = args[1];
+            let end = args[2] || args[0];
+            let end_time = args[2];
+            //console.log(start.length);
+            
+            start = start + " 00:00:00";    
+            end = end + " 23:59:59";
 
             const logs = await getLogsBetween(start,end);
-
+            //console.log("start:", start, "end:",end);
             if(!logs.length){
                 await message.reply("nincs log ebben az időszakban");
                 return;
@@ -63,7 +68,7 @@ module.exports = [
 
             let text = "logok: \n\n";
             for(const log of logs.slice(0,10)){
-                text +=`[${log.created_at}]${log.type} - ${log_message}\n`;
+                text +=`[${log.created_at}]${log.type} - ${log.message}\n`;
             }
 
             await message.reply("```"+text+"```");

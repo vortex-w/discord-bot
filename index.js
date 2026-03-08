@@ -8,7 +8,7 @@ const {initDatabase} = require('./database/init');
 const {saveUser} = require('./database/queries/users');
 const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
 const kopapirollo = require('./game/kopapirollo');
-const {logError, logInfo, logWarn} = require('./database/logger');
+const {logError, logInfo, logWarn, getLogsBetween} = require('./database/logger');
 
 const client = new Client({
     intents: [

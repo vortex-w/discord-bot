@@ -117,7 +117,7 @@ module.exports = [
                     `Globális név: ${user.global_name || 'nincs'} \n\n`+
                     `Szerver: \n` +
                     `ID: ${guild?.guild_id || 'nincs'} \n`+
-                    `Név: ${guid?.guild_name || 'nincs'}\n`+
+                    `Név: ${guild?.guild_name || 'nincs'}\n`+
                     `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`
                 );
             }catch (error){

@@ -8,6 +8,7 @@ const {initDatabase} = require('./database/init');
 const {saveUser} = require('./database/queries/users');
 const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
 const kopapirollo = require('./game/kopapirollo');
+const {logError, logInfo, logWarn} = require('./database/logger');
 
 const client = new Client({
     intents: [
@@ -42,10 +43,12 @@ for (const command of allCommands) {
 
 client.once('clientReady', async () => {
     console.log(`Bot elindult: ${client.user.tag}`);
+    await logInfo('bot elindult');
     try{
         await initDatabase();
     }catch(error){
         console.error('adatbázis inicializási hiba:' , error);
+        await logError(error, 'adatbázis inicializálási hiba');
     }
 });
 
@@ -58,6 +61,7 @@ client.on('messageCreate', async (message) => {
             await saveGuildUser(message.author);
             await saveGuild(message.guild);
             await saveGuildUser(message.guild.id, message.author.id);
+            await saveUser(message.author);
         }catch(dbError){
             console.error('Automatikus user/guil mentési hiba:', dbError);
         }
@@ -88,6 +92,12 @@ client.on('messageCreate', async (message) => {
         }
     } catch (error) {
         console.error('Hiba a messageCreate eseménynél:', error);
+        await logError(error, 'messegaCreate esemény',{
+            user_id: message.author.id,
+            user_name: message.author.username,
+            guild_id: message.guild.id,
+            guild_name: message.guild.name
+        });
     }
 });
 

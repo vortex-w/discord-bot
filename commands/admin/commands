@@ -1,4 +1,4 @@
-
+const { logInfo, logError, logWarn, getLogsBetween } = require('../../database/logger');
 module.exports = [
     {
         name: 'adminping',
@@ -11,6 +11,100 @@ module.exports = [
 
         async slash(interaction) {
             await interaction.reply('admin pong');
+        }
+    },
+    {
+        name: 'logteszt',
+        description: 'Létre hoz egy log info bejegyzést az adatbázisban a logolás tesztelésével.',
+        permissionLevel: 'admin',
+        async prefix(message,args){
+            await logInfo('Teszt üzenet',{
+                user_id: message.author.id,
+                user_name: message.author.username,
+                guild_id: message.guild.id,
+                guild_name: message.guild.name
+            });
+            await message.reply('Log bejegyzés létrehozva.');
+        },
+        async slash(interaction){
+            await interaction.reply({
+                content : 'Log bejegyzés létrehozva',
+                ephemeral : true
+            });
+            await logInfo('Teszt üzenet',{
+                user_id: interaction.user.id,
+                user_name: interaction.user.username,
+                guild_id: interaction.guild.id,
+                guild_name: interaction.guild.name
+            });
+        }
+    },
+    {
+        name: 'loglist',
+        description: 'Dátumon belül ki listáza a log eredményeit.',
+        permissionLevel: 'admin',
+        async prefix(message, args){
+            if(!args[0]){
+                await message.reply("Használat: !loglist 2026-03-08 vagy !logs 2026-03-07 2026-03-08");
+                return;
+            }
+            let start = args[0];
+            let end = args[1] || args[0];
+            start = start + "00:00:00";
+            end = end + "23:59:59";
+
+            const logs = await getLogsBetween(start,end);
+
+            if(!logs.length){
+                await message.reply("nincs log ebben az időszakban");
+                return;
+                
+            }
+
+            let text = "logok: \n\n";
+            for(const log of logs.slice(0,10)){
+                text +=`[${log.created_at}]${log.type} - ${log_message}\n`;
+            }
+
+            await message.reply("```"+text+"```");
+        },
+        async slash(interaction){
+
+            const startDate = interaction.options.getString('start');
+            const endDate = interaction.options.getString('end') || startDate;
+
+            if(!startDate){
+                await interaction.reply({
+                    content: 'Adj meg egy dátumot. Példa: 2026-03-08',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            const start = startDate + " 00:00:00";
+            const end = endDate + " 23:59:59";
+
+            const logs = await getLogsBetween(start,end);
+
+            if(!logs.length){
+                await interaction.reply({
+                    content: "Nincs log ebben az időszakban.",
+                    ephemeral: true
+                });
+                return;
+            }
+
+            let text = "Logok:\n\n";
+
+            for(const log of logs.slice(0,10)){
+                text += `[${log.created_at}] ${log.type} - ${log.message}\n`;
+            }
+
+            await interaction.reply({
+                content: "```"+text+"```",
+                ephemeral: true
+            });
+
         }
     }
 ];

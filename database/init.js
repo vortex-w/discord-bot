@@ -28,6 +28,19 @@ async function initDatabase(){
                     UNIQUE(guild_id, user_id)
                 )
             `);
+        await run(`
+                CREATE TABLE IF NOT EXISTS logs(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                stack TEXT,
+                user_id ,
+                user_name,
+                guild_id ,
+                guild_name,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
             console.log('SQLite táblák létrehozva, vagy már léteznek');
 }
 

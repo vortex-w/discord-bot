@@ -106,7 +106,7 @@ module.exports = [
                 const guild = await getGuildById(message.guild.id);
 
                 if(!user){
-                    await message.reply('Nem talltam a user adatait az adatbázisban.');
+                    await message.reply(`Nem találtam a user adatait az adatbázisban.${user}`);
                     return;
                 }
 
@@ -125,11 +125,39 @@ module.exports = [
                 await message.reply('Hiba Történt az adatbázis lekérdezéáse közben!');
             }
         },
-        async slash(interaction){
-            await interaction.reply({
-                ccontent: 'A slash verzió még nincs bekötve ehhez a arancshoz.',
-                ephemeral: true
-            });
-        }
+        async slash(interaction) {
+                                try {
+                                    const user = await getUserById(interaction.user.id);
+                                    const guild = await getGuildById(interaction.guild.id);
+
+                                    let text = '';
+
+                                    if (!user) {
+                                        text = 'Nincs meg a user';
+                                    } else {
+                                        text =
+                                            `Felhasználó:\n` +
+                                            `ID: ${user.user_id}\n` +
+                                            `Név: ${user.username}\n` +
+                                            `Globális név: ${user.global_name || 'nincs'}\n\n` +
+                                            `Szerver:\n` +
+                                            `ID: ${guild?.guild_id || 'nincs'}\n` +
+                                            `Név: ${guild?.guild_name || 'nincs'}\n` +
+                                            `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`;
+                                    }
+
+                                    await interaction.reply({
+                                        content: text,
+                                        ephemeral: true
+                                    });
+                                } catch (error) {
+                                    console.error('mydb slash hiba:', error);
+
+                                    await interaction.reply({
+                                        content: 'Hiba történt az adatbázis lekérdezése közben.',
+                                        ephemeral: true
+                                    });
+                                }
+                            }
     }
 ];

@@ -9,6 +9,7 @@ const {saveUser} = require('./database/queries/users');
 const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
 const kopapirollo = require('./game/kopapirollo');
 const {logError, logInfo, logWarn, getLogsBetween} = require('./database/logger');
+const { createGuildRolesTable,syncGuildRoles }  = require('./database/guildRoles');
 
 const client = new Client({
     intents: [
@@ -24,6 +25,7 @@ const publicCommands = require('./commands/public/commands');
 const modCommands = require('./commands/mod/commands');
 const adminCommands = require('./commands/admin/commands');
 const ownerCommands = require('./commands/owner/commands');
+
 
 const allCommands = [
     ...publicCommands,
@@ -47,6 +49,10 @@ client.once('clientReady', async () => {
     await logInfo('bot elindult');
     try{
         await initDatabase();
+        await createGuildRolesTable();
+        for(const guild of client.guilds.cache.values()){
+            await syncGuildRoles(guild);
+        }
     }catch(error){
         console.error('adatbázis inicializási hiba:' , error);
         await logError(error, 'adatbázis inicializálási hiba');

@@ -144,5 +144,44 @@ module.exports = [
             await logInfo('Egy admin törölni akarta a logbejegyzést, de nem sikerült, mert ez a parancs még nem él! Commands/admin/commands');
 
         }
+    },
+    {
+        name : 'ranglekerdezes',
+        description: 'Lekérdezi a szerveren lévő rangokat',
+        permissionLevel: 'admin',
+
+        async prefix(message,args){
+            if(args[0] && args[0]==="help"){
+                message.reply(this.description);
+            }else{
+                const roles = await getGuildRoles(message.guild.id);
+                if(!roles.length){
+                    return message.reply("Nincs adat az adatbázisban.");
+                }
+                let text = "Szerver rangok az adatbázisból:\n\n";
+                for(const role of roles){
+                    text += `${role.role_name} | ${role.role_id} | pos:${role.role_position}\n`;
+                }
+                message.reply("```"+text+"```");
+            }
+        }
+    },
+    {
+        name : 'setrole',
+        description: 'Rang jogosultság beállítása',
+        permissionLevel: 'admin',
+
+        async prefix(message,args){
+            const role = message.mentions.roles.first();
+            const level = args[1];
+            if(!role){
+                return message.reply("Adj meg egy rangot. Pl: !setrole @moderátor mod");
+            }
+            if(!level){
+                return message.reply("Adj meg egy jogosultsági szintent.");
+            }
+            await setRolePermission(message.guild.id,role.id,level);
+            message.reply(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
+        }
     }
 ];

@@ -54,9 +54,23 @@ async function getGuildRoles(guildId){
             guildId
         ]);
 }
+
+async function setRolePermission(guildId,roleId,level){
+    await run(`
+            INSERT INTO bot_role_permissions(guild_id,role_id,permission_level)
+            VALUES(?,?,?)
+            ON CONFLICT(guild_id,role_id) DO UPDATE SET
+            permission_level = excluded.permission_level
+        `,[
+            guildId,
+            roleId,
+            level
+        ])
+}
 module.exports = {
     createGuildRolesTable,
     saveGuildRole,
     syncGuildRoles,
-    getGuildRoles
+    getGuildRoles,
+    setRolePermission
 }

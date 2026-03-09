@@ -34,11 +34,21 @@ async function initDatabase(){
                 type TEXT NOT NULL,
                 message TEXT NOT NULL,
                 stack TEXT,
-                user_id ,
-                user_name,
-                guild_id ,
-                guild_name,
+                user_id TEXT,
+                user_name TEXT,
+                guild_id TEXT,
+                guild_name TEXT,
                 created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            `);
+        await run(`
+                CREATE TABLE IF NOT EXISTS bot_role_permissions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                role_id TEXT NOT NULL,
+                permission_level TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                UNIQUE(guild_id, role_id)
                 )
             `);
             console.log('SQLite táblák létrehozva, vagy már léteznek');

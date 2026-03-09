@@ -172,13 +172,17 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message,args){
+            const allowedLevels = ['public', 'mod', 'admin', 'owner'];
             const role = message.mentions.roles.first();
-            const level = args[1];
+            const level = args[1]?.toLowerCase();
             if(!role){
                 return message.reply("Adj meg egy rangot. Pl: !setrole @moderátor mod");
             }
             if(!level){
                 return message.reply("Adj meg egy jogosultsági szintent.");
+            }
+            if(!allowedLevels.includes(level)){
+                return message.reply("Érvénytelen jogosultsági szint. Lehet: public, mod, admin, owner");
             }
             await setRolePermission(message.guild.id,role.id,level);
             message.reply(`A **${role.name}** rang mostantól **${level}** jogosultságú`);

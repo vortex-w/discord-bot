@@ -67,10 +67,21 @@ async function setRolePermission(guildId,roleId,level){
             level
         ])
 }
+
+async function getRolePermissions(guildId){
+    return await all(`
+            SELECT roleid,permission_level
+            FROM bot_role_permissions
+            WHERE guild_id = ?
+        `,[
+            guildId
+        ])
+}
 module.exports = {
     createGuildRolesTable,
     saveGuildRole,
     syncGuildRoles,
     getGuildRoles,
-    setRolePermission
+    setRolePermission,
+    getRolePermissions
 }

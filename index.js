@@ -35,6 +35,7 @@ const allCommands = [
 for (const command of allCommands) {
     if (!command.name) {
         console.log('Találtam egy hibás parancsot, nincs name mező.');
+         logInfo('Parancs, aminek nincs neve!');
         continue;
     }
 
@@ -63,7 +64,13 @@ client.on('messageCreate', async (message) => {
             await saveGuildUser(message.guild.id, message.author.id);
             await saveUser(message.author);
         }catch(dbError){
-            console.error('Automatikus user/guil mentési hiba:', dbError);
+            console.error('Automatikus user/guild mentési hiba:', dbError);
+            await logError(dbError,'user/guild mentési hiba',{
+            user_id: message.author.id,
+            user_name: message.author.username,
+            guild_id: message.guild.id,
+            guild_name: message.guild.name
+        });
         }
         if(await kopapirollo(message,client)) return;
         if (!message.content.startsWith('!')) return;

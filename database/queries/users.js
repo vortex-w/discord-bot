@@ -3,11 +3,11 @@ const { run, get} = require('../db');
 async function saveUser(user){
     await run(`
             INSERT INTO users(user_id,username,global_name,updated_at)
-            VALUES(?,?,?, CURRENT_TIMESTAMP)
+            VALUES(?,?,?,datetime('now', 'localtime'))
             ON CONFLICT(user_id) DO UPDATE SET
                 username = excluded.username,
                 global_name = excluded.global_name,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = datetime('now', 'localtime')
         `,[
             user.id,
             user.username,

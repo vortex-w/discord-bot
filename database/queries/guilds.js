@@ -3,11 +3,11 @@ const { run, get} = require('../db');
 async function saveGuild(guild) {
     await run(`
         INSERT INTO guilds (guild_id, guild_name, owner_id, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, datetime('now', 'localtime'))
         ON CONFLICT(guild_id) DO UPDATE SET
             guild_name = excluded.guild_name,
             owner_id = excluded.owner_id,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at =  datetime('now', 'localtime')
     `, [
         guild.id,
         guild.name,

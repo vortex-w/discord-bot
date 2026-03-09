@@ -75,11 +75,10 @@ module.exports = [
                 end = args[2];
                 end = end + " " + args[3];
             }
-            console.log(args[0],args[1],args[2],args[3]);
+            //console.log(args[0],args[1],args[2],args[3]);
             //console.log(start.length);
             
-            start = start + " 00:00:00";    
-            end = end + " 23:59:59";
+            
 
             const logs = await getLogsBetween(start,end);
             //console.log("start:", start, "end:",end);
@@ -103,7 +102,7 @@ module.exports = [
 
             if(!startDate){
                 await interaction.reply({
-                    content: 'Adj meg egy dátumot. Példa: 2026-03-08',
+                    content: 'Adj meg egy dátumot. Példa: 2026-03-08 és a !loglist parancsot használd!',
                     ephemeral: true
                 });
                 return;
@@ -132,6 +131,17 @@ module.exports = [
                 content: "```"+text+"```",
                 ephemeral: true
             });
+
+        }
+    },
+    {
+        name: 'deletelog',
+        description : 'Kitörli egy lognaplót, vagy adott log elemet',
+        permissionLevel : 'admin',
+
+        async prefix(message,args){
+            await message.reply("Jelenleg még nem él ez a funkció!");
+            await logInfo('Egy admin törölni akarta a logbejegyzést, de nem sikerült, mert ez a parancs még nem él! Commands/admin/commands');
 
         }
     }

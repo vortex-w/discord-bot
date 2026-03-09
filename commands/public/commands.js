@@ -32,9 +32,7 @@ function buildCommandsMessage(member, allCommands){
     }
     let text = `A jogosultsági szinted: *${level}** \n\n`;
     text += `Használható parancsok:\n`;
-    if(groupedCommands.public.length){
-        text += `\n**PUBLIC**\n${groupedCommands.public.join('\n')}\n`;
-    }
+    
      if (groupedCommands.public.length) {
         text += `\n**PUBLIC**\n${groupedCommands.public.join('\n')}\n`;
     }

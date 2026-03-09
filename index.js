@@ -95,7 +95,7 @@ client.on('messageCreate', async (message) => {
 
         const permissionLevel = command.permissionLevel || 'public';
 
-        if (!canUseLevel(message.member, permissionLevel)) {
+        if(!(await canUseLevel(message.member, command.permissionLevel))){
             await message.reply(getNoPermissionMessage(permissionLevel));
             return;
         }

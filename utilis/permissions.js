@@ -1,62 +1,62 @@
-
-function parseIdList(value){
-    if(!value) return [];
-    return value
-        .split(',')
-        .map(id =>id.trim())
-        .filter(id => id !=='');
-}
-
-function getAdminRoleIds(){
-    return parseIdList(process.env.ADMIN_ROLE_IDS);
-}
-function getModRoleIds(){
-    return parseIdList(process.env.MOD_ROLE_IDS);
-}
+const { getRolePermissions } = require('./database/guildRoles');
 
 function isBotOwner(userId){
     return userId === process.env.BOT_OWNER_ID;
-
 }
+
 function isGuildOwner(guild, userId){
     if(!guild) return false;
     return guild.ownerId === userId;
 }
-function isOwner(guild,userId){
+
+function isOwner(guild, userId){
     return isBotOwner(userId) || isGuildOwner(guild, userId);
 }
 
-function memberHasAnyRole(member, RoleIds = []){
+function memberHasAnyRole(member, roleIds = []){
     if(!member || !member.roles || !member.roles.cache) return false;
-    return RoleIds.some(roleId => member.roles.cache.has(roleId));
+    return roleIds.some(roleId => member.roles.cache.has(roleId));
 }
 
-function isAdmin(member){
-    if(!member || !member.guild)return false;
+async function getPermissionRoleIds(guildId, level){
+    const rows = await getRolePermissions(guildId);
+    return rows
+        .filter(row => row.permission_level === level)
+        .map(row => row.role_id);
+}
 
-    if(isOwner(member.guild, member.id))return true;
-    const adminRoleIds = getAdminRoleIds();
+async function isAdmin(member){
+    if(!member || !member.guild) return false;
+
+    if(isOwner(member.guild, member.id)) return true;
+
+    const adminRoleIds = await getPermissionRoleIds(member.guild.id, 'admin');
     return memberHasAnyRole(member, adminRoleIds);
 }
 
-function isMod(member){
-    if (!member || !member.guild) return false;
-    if (isAdmin(member)) return true;
-    const modRoleIds = getModRoleIds();
-    return memberHasAnyRole(member,modRoleIds);
+async function isMod(member){
+    if(!member || !member.guild) return false;
+
+    if(await isAdmin(member)) return true;
+
+    const modRoleIds = await getPermissionRoleIds(member.guild.id, 'mod');
+    return memberHasAnyRole(member, modRoleIds);
 }
 
-function canUseLevel(member, level = 'public'){
+async function canUseLevel(member, level = 'public'){
     switch(level){
         case 'owner':
             return isOwner(member.guild, member.id);
-        case'admin':
-            return isAdmin(member);
+
+        case 'admin':
+            return await isAdmin(member);
+
         case 'mod':
-            return isMod(member);
-            case 'public':
-                default:
-                    return true;
+            return await isMod(member);
+
+        case 'public':
+        default:
+            return true;
     }
 }
 
@@ -67,17 +67,13 @@ function getNoPermissionMessage(level = 'public'){
         case 'admin':
             return 'Ehhez a parancshoz admin jogosultság kell.';
         case 'mod':
-            return 'Ehhez a parancshoz mod jogosultság kell';
+            return 'Ehhez a parancshoz mod jogosultság kell.';
         default:
-            return 'ehhez a parancshoz nincs jogosultságod.';
-
+            return 'Ehhez a parancshoz nincs jogosultságod.';
     }
 }
 
 module.exports = {
-    parseIdList,
-    getAdminRoleIds,
-    getModRoleIds,
     isBotOwner,
     isGuildOwner,
     isOwner,
@@ -86,4 +82,4 @@ module.exports = {
     isMod,
     canUseLevel,
     getNoPermissionMessage
-}
+};

@@ -51,6 +51,64 @@ async function initDatabase(){
                 UNIQUE(guild_id, role_id)
                 )
             `);
+        await run(`
+                CREATE TABLE IF NOT EXISTS user_command_permissions(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    command_name TEXT NOT NULL,
+                    allowed INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    UNIQUE(guild_id,user_id,command_name)
+                )
+            `);
+        await run(`
+                CREATE TABLE IF NOT EXISTS quiz_games(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    message_id TEXT,
+                    creator_id TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    ends_at TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active'
+                )
+            `);
+            await run(`
+                    CREATE TABLE IF NOT EXISTS quiz_answers(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        quiz_id INTEGER NOT NULL,
+                        answer_text TEXT NOT NULL,
+                        is_correct INTEGER NOT NULL DEFAULT 0,
+                        answer_index INTEGER NOT NULL,
+                        FOREIGN KEY(quiz_id) REFERENCES quiz_games(id) ON DELETE CASCADE
+                    )
+                `);
+            await run(`
+                    CREATE TABLE IF NOT EXISTS quiz_votes(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        quiz_id INTEGER NOT NULL,
+                        user_id TEXT NOT NULL,
+                        user_name TEXT NOT NULL,
+                        answer_id INTEGER NOT NULL,
+                        is_correct INTEGER NOT NULL DEFAULT 0,
+                        voted_at TEXT NOT NULL,
+                        FOREIGN KEY(quiz_id) REFERENCES quiz_games(id) ON DELETE CASCADE,
+                        FOREIGN KEY(answer_id) REFERENCES quiz_answers(id) ON DELETE CASCADE,
+                        UNIQUE(quiz_id, user_id)
+                    )
+                `);
+            await run(`
+                    CREATE TABLE IF NOT EXISTS quiz_points(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        guild_id TEXT NOT NULL,
+                        user_id TEXT NOT NULL,
+                        user_name TEXT NOT NULL,
+                        points INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(guild_id,user_id)
+                    )
+                `);
             console.log('SQLite táblák létrehozva, vagy már léteznek');
 }
 

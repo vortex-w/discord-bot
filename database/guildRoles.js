@@ -1,5 +1,6 @@
-const {run, all} = require('./db');
+const {run, all, get} = require('./db');
 const {logError, logInfo} = require('./logger');
+const { getUserById } = require('./queries/users');
 async function createGuildRolesTable(){
     try{
         await run(`
@@ -77,11 +78,37 @@ async function getRolePermissions(guildId){
             guildId
         ])
 }
+async function setUserCommandPermission(guild,userId, commandName,allowed = 1){
+    await run(`
+            INSERT INTO user_command_permissions(guild_id, user_id, command_name, allowed)
+            VALUES(?,?,?,?)
+            ON CONFLICT(guild_id,user_id,command_name) DO UPDATE SET
+                allowed = excluded.allowed
+        `,[
+            guild,
+            userId,
+            commandName,
+            allowed
+        ]);
+}
+async function getUserCommandPermission(guildId,userId){
+    return await all(`
+            SELECT *
+            FROM user_command_permissions
+            WHERE guild_id = ? and user_id = ? 
+        `,[
+            guildId,
+            userId
+            
+        ]);
+}
 module.exports = {
     createGuildRolesTable,
     saveGuildRole,
     syncGuildRoles,
     getGuildRoles,
     setRolePermission,
-    getRolePermissions
+    getRolePermissions,
+    setUserCommandPermission,
+    getUserCommandPermission
 }

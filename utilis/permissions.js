@@ -1,4 +1,4 @@
-const { getRolePermissions } = require('./database/guildRoles');
+const { getRolePermissions } = require("../database/guildRoles");
 
 function isBotOwner(userId){
     return userId === process.env.BOT_OWNER_ID;

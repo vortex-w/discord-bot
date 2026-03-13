@@ -1,4 +1,9 @@
+
+
+const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
+
 const { logInfo, logError, logWarn, getLogsBetween } = require('../../database/logger');
+
 module.exports = [
     {
         name: 'adminping',
@@ -186,6 +191,94 @@ module.exports = [
             }
             await setRolePermission(message.guild.id,role.id,level);
             message.reply(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
+        }
+    },
+    {
+        name : 'parancstarsitas',
+        description: 'Engedélyez egy parancsot egy usernek',
+        permissionLevel: 'admin',
+
+        async prefix(message,args){
+            const user = message.mentions.users.first();
+            const commandName = args[1]?.toLowerCase();
+            if(!user){
+                return message.reply("Adj meg egy felhasználót. Példa: !parancstarsitas @user parancs");
+            }
+            if(!commandName){
+                return message.reply("Adj meg egy parancsnevet.");
+            }
+
+            await setUserCommandPermission(
+                message.guild.id,
+                user.id,
+                commandName,
+                1
+            );
+            message.reply(`A **${user.username} ** mostantól használhatja a **${commandName}** parancsot`);
+        }
+    },
+    {
+        name : 'parancsmegvonas',
+        description : 'Elveszi a jogosultságot egy parancshasználatáról a tagtól.',
+        permissionLevel: 'admin',
+
+        async prefix(message,args){
+            const user = message.mentions.users.first();
+            const commandName = args[1]?.toLowerCase();
+            if(!user){
+                return message.reply("Adj meg egy felhasználót. Példa: !parancsmegvonas @user parancs");
+            }
+            if(!commandName){
+                return message.reply("Adj meg egy parancsnevet.");
+            }
+            await setUserCommandPermission(
+                message.guild.id,
+                user.id,
+                commandName,
+                0
+            );
+            message.reply(`A **${user.username} ** mostantól nem használhatja a **${commandName}** parancsot`);
+        }
+    },
+    {
+        name : 'tagjogok',
+        description : 'Adott tagnak megmutatja milyen extra parancsai vannak',
+        permissionLevel :'admin',
+        async prefix(message, args){
+            const user = message.mentions.users.first();
+
+            if(!user){
+                return message.reply("Adj meg egy felhasználót. Példa: !tagjogok @user");
+            }
+            const perms = await getUserCommandPermission(
+                message.guild.id,
+                user.id
+            ) || [];
+            //console.log(perms);
+            if(!perms.length){
+                return message.reply(`${user.username} nem rendelkezik extra parancsokkal.`);
+            }
+            let text = `${user.username} extra parancsai:\n\n`;
+            let state = "";
+            
+            for(const perm of perms){
+                if(perm.allowed==1){
+                state = "igen";
+                }else{
+                    state = "Nem";
+                }
+                text += `${perm.command_name} Aktív:${state}\n`;
+            }
+            message.reply("```"+text+"```");
+        }
+    },
+    {
+        name : 'teszt_command',
+        description : 'userhez hzzárendelt parancs, amit vagy csak admin használhat, vagy hozzá rendelt tag!',
+        permissionLevel: 'admin',
+
+        async prefix(message, args){
+            message.reply("Használhatod ezt a parancsot");
         }
     }
 ];

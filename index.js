@@ -25,6 +25,7 @@ const publicCommands = require('./commands/public/commands');
 const modCommands = require('./commands/mod/commands');
 const adminCommands = require('./commands/admin/commands');
 const ownerCommands = require('./commands/owner/commands');
+const { getUserCommandPermission } = require('./database/queries/userCommandPermissions');
 
 
 const allCommands = [
@@ -42,6 +43,7 @@ for (const command of allCommands) {
     }
 
     client.commands.set(command.name, command);
+    
 }
 
 client.once('clientReady', async () => {
@@ -65,7 +67,7 @@ client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
         if (!message.guild) return;
         try{
-            await saveGuildUser(message.author);
+            //await saveGuildUser(message.author);
             await saveGuild(message.guild);
             await saveGuildUser(message.guild.id, message.author.id);
             await saveUser(message.author);
@@ -92,16 +94,26 @@ client.on('messageCreate', async (message) => {
             await message.reply(`Ismeretlen parancsot adtál meg: ${commandName}`);
             return;
         }
-
+        
         const permissionLevel = command.permissionLevel || 'public';
-
-        if(!(await canUseLevel(message.member, command.permissionLevel))){
-            await message.reply(getNoPermissionMessage(permissionLevel));
-            return;
+        const userPerm = await getUserCommandPermission(
+            message.guild.id,
+            message.author.id,
+            command.name
+        );
+        if(userPerm && userPerm.allowed){
+            // van külön engedély → mehet
+        }else{
+            // normál rang ellenőrzés
+            if (!(await canUseLevel(message.member, permissionLevel))) {
+                await message.reply(getNoPermissionMessage(permissionLevel));
+                return;
+            }
         }
 
         if (typeof command.prefix === 'function') {
             await command.prefix(message, args, client);
+            
         }
     } catch (error) {
         console.error('Hiba a messageCreate eseménynél:', error);
@@ -123,13 +135,19 @@ client.on('interactionCreate', async (interaction) => {
         if (!command) return;
 
         const permissionLevel = command.permissionLevel || 'public';
-
-        if (!canUseLevel(interaction.member, permissionLevel)) {
-            await interaction.reply({
-                content: getNoPermissionMessage(permissionLevel),
-                ephemeral: true
-            });
-            return;
+        const userPerm = await getUserCommandPermission(
+            message.guild.id,
+            message.author.id,
+            command.name
+        );
+        if(userPerm && userPerm.allowed){
+            // van külön engedély → mehet
+        }else{
+            // normál rang ellenőrzés
+            if (!(await canUseLevel(message.member, permissionLevel))) {
+                await message.reply(getNoPermissionMessage(permissionLevel));
+                return;
+            }
         }
 
         if (typeof command.slash === 'function') {

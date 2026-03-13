@@ -11,6 +11,7 @@ const kopapirollo = require('./game/kopapirollo');
 const {logError, logInfo, logWarn, getLogsBetween} = require('./database/logger');
 const { createGuildRolesTable,syncGuildRoles }  = require('./database/guildRoles');
 
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -26,6 +27,7 @@ const modCommands = require('./commands/mod/commands');
 const adminCommands = require('./commands/admin/commands');
 const ownerCommands = require('./commands/owner/commands');
 const { getUserCommandPermission } = require('./database/queries/userCommandPermissions');
+const { handleQuizButton } = require('./events/quizButtonhandler');
 
 
 const allCommands = [
@@ -106,7 +108,7 @@ client.on('messageCreate', async (message) => {
         }else{
             // normál rang ellenőrzés
             if (!(await canUseLevel(message.member, permissionLevel))) {
-                await message.reply(getNoPermissionMessage(permissionLevel));
+                await message.channel.send(getNoPermissionMessage(permissionLevel));
                 return;
             }
         }
@@ -124,10 +126,18 @@ client.on('messageCreate', async (message) => {
             guild_name: message.guild.name
         });
     }
+    try{
+        await message.delete();
+    }catch(deleteError){
+        console.error("Az eredeti üzenetet nem sikerült törölni:", deleteError.message);
+        logError(deleteError,'Hiba a törlés közben');
+    } 
 });
 
 client.on('interactionCreate', async (interaction) => {
     try {
+        
+        if(await handleQuizButton(interaction)) return;
         if (!interaction.isChatInputCommand()) return;
         if (!interaction.guild) return;
         
@@ -136,16 +146,16 @@ client.on('interactionCreate', async (interaction) => {
 
         const permissionLevel = command.permissionLevel || 'public';
         const userPerm = await getUserCommandPermission(
-            message.guild.id,
-            message.author.id,
+            interaction.guild.id,
+            interaction.user.id,
             command.name
         );
         if(userPerm && userPerm.allowed){
             // van külön engedély → mehet
         }else{
             // normál rang ellenőrzés
-            if (!(await canUseLevel(message.member, permissionLevel))) {
-                await message.reply(getNoPermissionMessage(permissionLevel));
+            if (!(await canUseLevel(interaction.member, permissionLevel))) {
+                await interaction.reply(getNoPermissionMessage(permissionLevel));
                 return;
             }
         }
@@ -161,6 +171,7 @@ client.on('interactionCreate', async (interaction) => {
                 content: 'Hiba történt a parancs feldolgozása közben.',
                 ephemeral: true
             });
+            logError(error,'hiba');
         }
     }
 });

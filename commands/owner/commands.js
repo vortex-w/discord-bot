@@ -6,7 +6,7 @@ module.exports = [
         permissionLevel: 'owner',
 
         async prefix(message, args) {
-            await message.reply('owner pong');
+            await message.channel.send('owner pong');
         },
 
         async slash(interaction) {

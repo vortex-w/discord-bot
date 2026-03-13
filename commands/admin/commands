@@ -11,11 +11,16 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message, args) {
-            await message.reply('admin pong');
+            await message.channel.send('admin pong');
         },
 
         async slash(interaction) {
-            await interaction.reply('admin pong');
+            try{
+                await interaction.reply('admin pong');
+            }catch(error){
+                logError(error,'hiba a parancs létrehozásakor');
+                console.log(error);
+            }
         }
     },
     {
@@ -29,7 +34,7 @@ module.exports = [
                 guild_id: message.guild.id,
                 guild_name: message.guild.name
             });
-            await message.reply('Log bejegyzés létrehozva.');
+            await message.channel.send('Log bejegyzés létrehozva.');
         },
         async slash(interaction){
             await interaction.reply({
@@ -55,7 +60,7 @@ module.exports = [
             let end = "";
             let end_time = "";
             if(!args[0]){
-                await message.reply("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
+                await message.channel.send("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
                 return;
             }
             if(!args[1]){
@@ -88,7 +93,7 @@ module.exports = [
             const logs = await getLogsBetween(start,end);
             //console.log("start:", start, "end:",end);
             if(!logs.length){
-                await message.reply("nincs log ebben az időszakban");
+                await message.channel.send("nincs log ebben az időszakban");
                 return;
                 
             }
@@ -98,7 +103,7 @@ module.exports = [
                 text +=`[${log.created_at}]${log.type} - ${log.message}\n`;
             }
 
-            await message.reply("```"+text+"```");
+            await message.channel.send("```"+text+"```");
         },
         async slash(interaction){
 
@@ -145,7 +150,7 @@ module.exports = [
         permissionLevel : 'admin',
 
         async prefix(message,args){
-            await message.reply("Jelenleg még nem él ez a funkció!");
+            await message.channel.send("Jelenleg még nem él ez a funkció!");
             await logInfo('Egy admin törölni akarta a logbejegyzést, de nem sikerült, mert ez a parancs még nem él! Commands/admin/commands');
 
         }
@@ -157,17 +162,17 @@ module.exports = [
 
         async prefix(message,args){
             if(args[0] && args[0]==="help"){
-                message.reply(this.description);
+                message.channel.send(this.description);
             }else{
                 const roles = await getGuildRoles(message.guild.id);
                 if(!roles.length){
-                    return message.reply("Nincs adat az adatbázisban.");
+                    return message.channel.send("Nincs adat az adatbázisban.");
                 }
                 let text = "Szerver rangok az adatbázisból:\n\n";
                 for(const role of roles){
                     text += `${role.role_name} | ${role.role_id} | pos:${role.role_position}\n`;
                 }
-                message.reply("```"+text+"```");
+                message.channel.send("```"+text+"```");
             }
         }
     },
@@ -181,16 +186,16 @@ module.exports = [
             const role = message.mentions.roles.first();
             const level = args[1]?.toLowerCase();
             if(!role){
-                return message.reply("Adj meg egy rangot. Pl: !setrole @moderátor mod");
+                return message.channel.send("Adj meg egy rangot. Pl: !setrole @moderátor mod");
             }
             if(!level){
-                return message.reply("Adj meg egy jogosultsági szintent.");
+                return message.channel.send("Adj meg egy jogosultsági szintent.");
             }
             if(!allowedLevels.includes(level)){
-                return message.reply("Érvénytelen jogosultsági szint. Lehet: public, mod, admin, owner");
+                return message.channel.send("Érvénytelen jogosultsági szint. Lehet: public, mod, admin, owner");
             }
             await setRolePermission(message.guild.id,role.id,level);
-            message.reply(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
+            message.channel.send(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
         }
     },
     {
@@ -202,10 +207,10 @@ module.exports = [
             const user = message.mentions.users.first();
             const commandName = args[1]?.toLowerCase();
             if(!user){
-                return message.reply("Adj meg egy felhasználót. Példa: !parancstarsitas @user parancs");
+                return message.channel.send("Adj meg egy felhasználót. Példa: !parancstarsitas @user parancs");
             }
             if(!commandName){
-                return message.reply("Adj meg egy parancsnevet.");
+                return message.channel.send("Adj meg egy parancsnevet.");
             }
 
             await setUserCommandPermission(
@@ -214,7 +219,7 @@ module.exports = [
                 commandName,
                 1
             );
-            message.reply(`A **${user.username} ** mostantól használhatja a **${commandName}** parancsot`);
+            message.channel.send(`A **${user.username} ** mostantól használhatja a **${commandName}** parancsot`);
         }
     },
     {
@@ -226,10 +231,10 @@ module.exports = [
             const user = message.mentions.users.first();
             const commandName = args[1]?.toLowerCase();
             if(!user){
-                return message.reply("Adj meg egy felhasználót. Példa: !parancsmegvonas @user parancs");
+                return message.channel.send("Adj meg egy felhasználót. Példa: !parancsmegvonas @user parancs");
             }
             if(!commandName){
-                return message.reply("Adj meg egy parancsnevet.");
+                return message.channel.send("Adj meg egy parancsnevet.");
             }
             await setUserCommandPermission(
                 message.guild.id,
@@ -237,7 +242,7 @@ module.exports = [
                 commandName,
                 0
             );
-            message.reply(`A **${user.username} ** mostantól nem használhatja a **${commandName}** parancsot`);
+            message.channel.send(`A **${user.username} ** mostantól nem használhatja a **${commandName}** parancsot`);
         }
     },
     {
@@ -248,7 +253,7 @@ module.exports = [
             const user = message.mentions.users.first();
 
             if(!user){
-                return message.reply("Adj meg egy felhasználót. Példa: !tagjogok @user");
+                return message.channel.send("Adj meg egy felhasználót. Példa: !tagjogok @user");
             }
             const perms = await getUserCommandPermission(
                 message.guild.id,
@@ -256,7 +261,7 @@ module.exports = [
             ) || [];
             //console.log(perms);
             if(!perms.length){
-                return message.reply(`${user.username} nem rendelkezik extra parancsokkal.`);
+                return message.channel.send(`${user.username} nem rendelkezik extra parancsokkal.`);
             }
             let text = `${user.username} extra parancsai:\n\n`;
             let state = "";
@@ -269,7 +274,7 @@ module.exports = [
                 }
                 text += `${perm.command_name} Aktív:${state}\n`;
             }
-            message.reply("```"+text+"```");
+            message.channel.send("```"+text+"```");
         }
     },
     {
@@ -278,7 +283,7 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message, args){
-            message.reply("Használhatod ezt a parancsot");
+            message.channel.send("Használhatod ezt a parancsot");
         }
     }
 ];

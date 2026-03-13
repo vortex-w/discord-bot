@@ -58,7 +58,7 @@ module.exports = [
         permissionLevel: 'public',
 
         async prefix(message, args){
-            await message.reply('pong');
+            await message.channel.send('pong');
         },
         async slash(interaction){
             await interaction.reply('pong');
@@ -71,7 +71,7 @@ module.exports = [
 
         async prefix(message, args) {
             const level = getUserLevel(message.member);
-            await message.reply(`A jogosultsági szinted: **${level}**`);
+            await message.channel.send(`A jogosultsági szinted: **${level}**`);
         },
 
         async slash(interaction) {
@@ -86,7 +86,7 @@ module.exports = [
 
         async prefix(message,args,client){
             const text = buildCommandsMessage(message.member, client.commands);
-            await message.reply(text);
+            await message.channel.send(text);
         },
         async slash(interaction, client){
             const text = buildCommandsMessage(interaction.member, client.commands);
@@ -104,11 +104,11 @@ module.exports = [
                 const guild = await getGuildById(message.guild.id);
 
                 if(!user){
-                    await message.reply(`Nem találtam a user adatait az adatbázisban.${user}`);
+                    await message.channel.send(`Nem találtam a user adatait az adatbázisban.${user}`);
                     return;
                 }
 
-                await message.reply(
+                await message.channel.send(
                     `Felhasználó:\n`+
                     `ID: ${user.user_id}\n`+
                     `Név: ${user.username}\n` + 

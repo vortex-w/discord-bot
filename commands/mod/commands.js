@@ -23,7 +23,7 @@ module.exports = [
         permissionLevel: 'mod',
 
         async prefix(message, args) {
-            await message.reply('mod pong');
+            await message.channel.send('mod pong');
         },
 
         async slash(interaction) {
@@ -36,7 +36,7 @@ module.exports = [
         permissionLevel: 'mod',
 
         async prefix(message, args) {
-
+            
             function formatDateTime(date) {
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -64,13 +64,13 @@ module.exports = [
             const raw = args.join(" ");
 
             if (!raw) {
-                return message.reply("Hiba: nem adtál meg adatokat.");
+                return message.channel.send("Hiba: nem adtál meg adatokat.");
             }
 
             let parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
 
             if (parts.length < 4) {
-                return message.reply("Hiba: legalább kérdés + 3 válasz kell.");
+                return message.channel.send("Hiba: legalább kérdés + 3 válasz kell.");
             }
 
             const question = parts[0];
@@ -110,7 +110,7 @@ module.exports = [
             }
 
             if (isNaN(endTime.getTime())) {
-                return message.reply("Hiba: az idő formátuma hibás.");
+                return message.channel.send("Hiba: az idő formátuma hibás.");
             }
 
             let answers = [];
@@ -133,23 +133,23 @@ module.exports = [
             }
 
             if (answers.length < 3) {
-                return message.reply("Legalább 3 válasz szükséges.");
+                return message.channel.send("Legalább 3 válasz szükséges.");
             }
 
             if (correctCount === 0) {
-                return message.reply("Legalább 1 helyes válasz kell. Használd a [true] jelölést.");
+                return message.channel.send("Legalább 1 helyes válasz kell. Használd a [true] jelölést.");
             }
 
             if (message.attachments.size === 0) {
-                return message.reply("Csatolj egy képet a quizhez.");
+                return message.channel.send("Csatolj egy képet a quizhez.");
             }
 
             const attachment = message.attachments.first();
 
             if (!attachment.contentType || !attachment.contentType.startsWith("image")) {
-                return message.reply("A csatolmány nem kép.");
-            }
-
+                return message.channel.send("A csatolmány nem kép.");
+            }  
+        
             //const imageUrl = attachment.url;
 
             // SQLite-kompatibilis formátum
@@ -172,7 +172,7 @@ module.exports = [
                             answerIndex: i
                         });
                     }
-
+                    
                     //await message.reply(`Quiz mentve. ID: ${quizId}\nLejárat: ${endTimeSql}`);
                     const embed = new EmbedBuilder()
                             .setTitle('quiz Játék')
@@ -195,19 +195,13 @@ module.exports = [
                         ]
                     });
 
-await updateQuizMessageId(quizId, botQuizMessage.id);
-                    logInfo(`Bot létre hozta a kvíz játékot id:${quizId}: ${message.author.username}`, 'info');
-                    try{
-                        await message.delete();
-                    }catch(deleteError){
-                         console.error("Az eredeti üzenetet nem sikerült törölni:", deleteError.message);
-                         logError(deleteError,'Hiba a törlés közben');
-                    }
+                    await updateQuizMessageId(quizId, botQuizMessage.id);
+                        logInfo(`Bot létre hozta a kvíz játékot id:${quizId}: ${message.author.username}`, 'info');
+                        
                 }catch(error){
                     logError(error,'Hiba a játék létre hozása közben');
                 }
 
-            
         }
     },
     {
@@ -218,31 +212,31 @@ await updateQuizMessageId(quizId, botQuizMessage.id);
             const mode = args[0];
             try{
                 if(!mode){
-                    return message.reply("Használat: !quiz-delete [id|last|all]");
+                    return message.channel.send("Használat: !quiz-delete [id|last|all]");
                 }
                 if(mode === 'all'){
                     await deleteAllQuizGames();
                     logInfo(`A bot törölte az összes kvíz játék elemet. Törlő: ${message.author.username}`,'info');
-                    return message.reply("Az összes quiz törölve lett.");
+                    return message.channel.send("Az összes quiz törölve lett.");
                 }
                 if(mode === 'last'){
                     const lastQuiz = await getLastQuizGame();
 
                     if(!lastQuiz){
-                        return message.reply("Nincs törölhető quiz");
+                        return message.channel.send("Nincs törölhető quiz");
                     }
                     await deleteQuizGameById(lastQuiz.id);
                     logInfo(`Bot törölte a legutóbbi kvíz játékot id:${lastQuiz.id} törlő: ${message.author.username}`,'info');
-                    return message.reply(`A legutóbbi quiz törölve lett . ID: ${lastQuiz.id}`);
+                    return message.channel.send(`A legutóbbi quiz törölve lett . ID: ${lastQuiz.id}`);
                     
                 }
                 const quizId = parseInt(mode,10);
                 if(isNaN(quizId)){
-                    return message.reply("Hibás quiz Id.");
+                    return message.channel.send("Hibás quiz Id.");
                 }
                 await deleteQuizGameById(quizId);
                 logInfo(`A bot törölte a ${quizId} elemű kvíz játékot. Törlő: ${message.author.username}`,'info');
-                return message.reply(`Quiz törölve. ID: ${quizId}`);
+                return message.channel.send(`Quiz törölve. ID: ${quizId}`);
                
             }catch(error){
                 logError(error,'Hiba a quiz törlése közben.');

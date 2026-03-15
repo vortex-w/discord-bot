@@ -1,8 +1,11 @@
 
 
-const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
 
+//Admin parancsok
+const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
+const { getGuildChannels, getGuildChannelByName } = require('../../database/queries/guildChannels');
 const { logInfo, logError, logWarn, getLogsBetween } = require('../../database/logger');
+const {addCommandChannel, getAllCommandChannelRules, getCommandChannels, removeCommandChannel} = require( '../../database/queries/commandChannels');
 
 module.exports = [
     {
@@ -284,6 +287,105 @@ module.exports = [
 
         async prefix(message, args){
             message.channel.send("Használhatod ezt a parancsot");
+        }
+    },
+    {
+        name : 'csatornalista',
+        description : 'Ki listázza a csatornák neveit és típusait.',
+        permissionLevel: 'admin',
+
+        async prefix(message){
+           const channels = await getGuildChannels(message.guild.id);
+
+           if(!channels || channels.length === 0){
+            return message.channel.send("Nincsenek csatornák eltárolva az adatbázisba");
+           }
+
+           const list = channels
+                .map(channel => `${channel.channel_name} | ${channel.channel_id} | ${channel.channel_type}`)
+                .join('\n');
+
+                await message.channel.send(`Csatornák adatbázisból:\n${list}`);
+        }
+    },
+    {
+        name : 'setcsatorna',
+        description : 'Használat: !setcsatorna [remove, add, list, show]; csatornaneve; parancs neve',
+        permissionLevel : 'admin',
+
+        async prefix(message, args, client){
+            const raw = args.join(" ").trim();
+            if(!raw){
+                return message.channel.send(
+                    'Használat:\n' +
+                    '!setcsatorna add; csatornanév; parancsnév\n' +
+                    '!setcsatorna remove; csatornanév; parancsnév\n' +
+                    '!setcsatorna show; parancsnév\n' +
+                    '!setcsatorna list'
+                );
+            }
+            const parts = raw.split(";").map(p=>p.trim()).filter(p=>p.length > 0);
+            const action = (parts[0] || "").toLowerCase();
+            if(action === "list"){
+                const rows = await getAllCommandChannelRules(message.guild.id);
+
+                if(!rows || rows.length===0){
+                    return message.channel.send("Nincs beállított parancs-csatorna hozzárendelés.");
+                    
+                }
+                const text = rows
+                    .map(row =>`${row.command_name} --> <#${row.channel_id}>`)
+                    .join("\n");
+
+                return message.channel.send(`Beállított hozzárendelések:\n${text}`);
+            }
+            if(action==="show"){
+                const commandName = parts[1];
+                if(!commandName){
+                    return message.channel.send("Használat: !setcsatorna show; parancsnév");
+                }
+                const rows = await getCommandChannels(message.guild.id, commandName);
+                if(!rows || rows.length === 0){
+                    return message.channel.send(`A(z) **${commandName}** parancshoz nincs csatorna rendelve.`);
+                }
+                const text = rows
+                    .map(row => `<#${row.channel_id}>`)
+                    .join("\n");
+
+                return message.channel.send(`A(z) **${commandName}** parancs csatornái:\n${text}`);
+            }
+            if(action !== "add" && action !=="remove"){
+                return message.channel.send("Ismeretlen művelet. Használat: add | remove | show | list");
+            }
+            const channelName = parts[1];
+            const commandName = parts[2];
+            if(!channelName || !commandName){
+                return message.channel.send(
+                    'Használat:\n' +
+                    '!setcsatorna add; csatornanév; parancsnév\n' +
+                    '!setcsatorna remove; csatornanév; parancsnév'
+                );
+            }
+            if(!client.commands.has(commandName)){
+                return message.channel.send(`A(z) **${commandName}** parancs nem létezik.`);
+            }
+            const channel = await getGuildChannelByName(message.guild.id, channelName);
+            if(!channel){
+                 return message.channel.send(`A(z) **${commandName}** parancs nem létezik.`);
+            }
+            try{
+                if(action === "add"){
+                
+                    await addCommandChannel(message.guild.id, commandName, channel.channel_id);
+                    return message.channel.send(`A(z) **${commandName}** parancs hozzá lett rendelve ehhez: **${channel.channel_name}**`);
+                }
+                if(action === "remove"){
+                    await removeCommandChannel(message.guild.id, commandName, channel.channel_id);
+                    return message.channel.send(`A(z) **${commandName}** parancs el lett távolítva innen: **${channel.channel_name}**`);
+                }
+            }catch (err){
+                logError(err,'Hiba a feltöltés vagy törlés során');
+            }
         }
     }
 ];

@@ -1,12 +1,16 @@
 const { permission } = require("node:process");
 const { getGuildRoles, setRolePermission } = require("../../database/guildRoles");
+
 const {
     createQuizGame,
     createQuizAnswer,
     updateQuizMessageId,
     deleteAllQuizGames,
     getLastQuizGame,
-    deleteQuizGameById
+    deleteQuizGameById,
+    getAllUserPoints,
+    getUserPoints,
+    removeQuizPoint
 } = require("../../game/quiz_game");
 const { logError, logInfo } = require("../../database/logger");
 const {
@@ -15,6 +19,9 @@ const {
     ButtonStyle,
     EmbedBuilder
 } = require('discord.js');
+const { getCommandChannels } = require("../../database/queries/commandChannels");
+const { createReward, deleteReward, getRewardById } = require("../../database/queries/rewardsjs");
+const { isAdmin } = require("../../utilis/permissions");
 
 module.exports = [
     {
@@ -141,7 +148,7 @@ module.exports = [
             }
 
             if (message.attachments.size === 0) {
-                return message.channel.send("Csatolj egy képet a quizhez.");
+                return message.channel.send("Csatolj egy képet a kvízhez.");
             }
 
             const attachment = message.attachments.first();
@@ -155,10 +162,21 @@ module.exports = [
             // SQLite-kompatibilis formátum
             const endTimeSql = formatDateTime(endTime);
             const createdAtSql = formatDateTime(new Date());
+
                 try{
+                    const commandChannels = await getCommandChannels(message.guild.id, 'quiz-game');
+                    let targetChannel = message.channel;
+                    if(commandChannels && commandChannels.length >0){
+                        const savedChannelId = commandChannels[0].channel_id;
+                        const foundChannel = await message.guild.channels.fetch(savedChannelId).catch(() =>null);
+
+                        if(foundChannel){
+                            targetChannel = foundChannel;
+                        }
+                    }
                     const quizId = await createQuizGame({
                         guildId : message.guild.id,
-                        channelId: message.channel.id,
+                        channelId: targetChannel.id,
                         creatorId: message.author.id,
                         question: question,
                         createdAt: createdAtSql,
@@ -176,15 +194,15 @@ module.exports = [
                     //await message.reply(`Quiz mentve. ID: ${quizId}\nLejárat: ${endTimeSql}`);
                     const embed = new EmbedBuilder()
                             .setTitle('quiz Játék')
-                            .setDescription(`**Kérdés:**${question}`)
+                            .setDescription(`**Kérdés:**\n**${question}**`)
                             .addFields(
-                                {name : 'Lejárat', value: endTimeSql, inline: false},
+                                {name : 'Lejárat', value: endTimeSql.slice(0, 16), inline: false},
                                 {name : 'indította', value : message.author.username, inline : false}
                             )
                             .setImage(`attachment://${attachment.name}`)
                             .setFooter({text: `quiz ID: ${quizId}`});
                     const components = buildAnswerButtons(quizId,answers);
-                    const botQuizMessage = await message.channel.send({
+                    const botQuizMessage = await targetChannel.send({
                         embeds: [embed],
                         components: components,
                         files:[
@@ -240,6 +258,291 @@ module.exports = [
                
             }catch(error){
                 logError(error,'Hiba a quiz törlése közben.');
+            }
+        }
+    },
+    {
+        name : 'listpoint',
+        description: 'ki listázza a játékosok pontjait, vagy egy adott játékosét. Használata: !listpoint [all, @user]',
+        permissionLevel: 'mod',
+
+        async prefix(message,args){
+            if(!args[0]){
+                return message.channel.send("Használat: !listpoint [all | @user]");
+            }
+            if(args[0] === "all"){
+                const rows = await getAllUserPoints(message.guild.id);
+                if(!rows || rows.length === 0){
+                    return message.channel.send("Használat: !listpoint [all | @user]");
+                }
+                const text = rows
+                    .map((row, index) => `${index+1}.${row.user_name} --> ${row.total} pont`)
+                    .join("\n");
+                     return message.channel.send(`🏆 Pontlista:\n${text}`);
+            }
+            const user = message.mentions.users.first();
+            if(!user){
+                  return message.channel.send("Adj meg egy felhasználót: !listpoint @user");
+            }
+            const rows = await getUserPoints(user.id);
+
+                if(!rows || rows.length === 0){
+                    return message.channel.send(`${user.username}-nek még nincs pontja.`);
+                }
+
+                let totalPoints = 0;
+                let details = "";
+
+                for(const row of rows){
+                    totalPoints += row.total;
+                    details += `${row.created_by} → ${row.total} pont\n`;
+                }
+
+                return message.channel.send(
+                    `${user.username}-nek összesen **${totalPoints}** pontja van.\n\n${details}`
+                );
+        }
+    },
+    {
+        name : 'removepoint',
+        description : 'Visszavon adott pontot adott embertől. Használat: !removepoint; @user; @creator; [mennyiség]',
+        permissionLevel : 'mod',
+
+        async prefix(message, args){
+            const raw = args.join(" ").trim();
+
+            if(!raw){
+                return message.channel.send(
+                    'Használat:\n!removepoint; @user; @creator; [mennyiség]'
+                );
+            }
+
+            const parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
+
+            if(parts.length < 3){
+                return message.channel.send(
+                    'Használat:\n!removepoint; @user; @creator; [mennyiség]'
+                );
+            }
+
+            const targetRaw = parts[0];
+            const creatorRaw = parts[1];
+            const amountRaw = parts[2];
+
+            const mentionToId = (text) => {
+                const match = text.match(/^<@!?(\d+)>$/);
+                return match ? match[1] : null;
+            };
+
+            const targetUserId = mentionToId(targetRaw);
+            const creatorUserId = mentionToId(creatorRaw);
+
+            if(!targetUserId || !creatorUserId){
+                return message.channel.send(
+                    'Hiba: a user és a creator megadása mention formában történjen.\n' +
+                    'Példa: !removepoint; @user; @creator; 1'
+                );
+            }
+
+            let amount = 1;
+            if(amountRaw !== undefined){
+                amount = parseInt(amountRaw, 10);
+            }
+
+            if(isNaN(amount) || amount <= 0){
+                return message.channel.send('A mennyiség legalább 1 legyen.');
+            }
+
+            const targetUser =
+                await message.client.users.fetch(targetUserId).catch(() => null);
+
+            const creatorUser =
+                await message.client.users.fetch(creatorUserId).catch(() => null);
+
+            if(!targetUser){
+                return message.channel.send('A cél felhasználó nem található.');
+            }
+
+            if(!creatorUser){
+                return message.channel.send('A creator felhasználó nem található.');
+            }
+
+            try{
+                await removeQuizPoint(
+                    message.guild.id,
+                    targetUser.id,
+                    creatorUser.id,
+                    amount
+                );
+
+                await message.channel.send(
+                    `**${targetUser.username}** felhasználótól levonva **${amount} pont**, ettől: **${creatorUser.username}**`
+                );
+
+                await logInfo(
+                    `Pont levonás | cél:${targetUser.username} (${targetUser.id}) | creator:${creatorUser.username} (${creatorUser.id}) | amount:${amount} | mod:${message.author.username}`,
+                    "info"
+                );
+            }catch(error){
+                console.error("Hiba a removepoint parancsnál:", error);
+                await logError(error, "Hiba a removepoint parancsnál");
+                return message.channel.send("Hiba történt a pont levonása közben.");
+            }
+        }
+    },
+    {
+        name : 'addjutalom',
+        description : 'Új jutalom létrehozása. Használat: !addjutalom; jutalom neve; leírás; pont; @creator',
+        permissionLevel : 'mod',
+
+        async prefix(message, args){
+            const raw = args.join(" ").trim();
+
+            if(!raw){
+                return message.channel.send(
+                    'Használat:\n!addjutalom; jutalom neve; leírás; pont; @creator'
+                );
+            }
+
+            const parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
+
+            if(parts.length < 4){
+                return message.channel.send(
+                    'Használat:\n!addjutalom; jutalom neve; leírás; pont; @creator'
+                );
+            }
+
+            const rewardName = parts[0];
+            const rewardDescription = parts[1];
+            const pointCostRaw = parts[2];
+            const creatorRaw = parts[3];
+
+            const pointCost = parseInt(pointCostRaw, 10);
+
+            if(!rewardName){
+                return message.channel.send("A jutalom neve nem lehet üres.");
+            }
+
+            if(isNaN(pointCost) || pointCost < 1){
+                return message.channel.send("A pont érték legalább 1 legyen.");
+            }
+
+            const mentionToId = (text) => {
+                const match = text.match(/^<@!?(\d+)>$/);
+                return match ? match[1] : null;
+            };
+
+            const creatorId = mentionToId(creatorRaw);
+
+            if(!creatorId){
+                return message.channel.send(
+                    'A creator megadása mention formában történjen.\n' +
+                    'Példa: !addjutalom; VIP rang; 7 napos VIP; 25; @user'
+                );
+            }
+
+            const creatorUser = await message.client.users.fetch(creatorId).catch(() => null);
+
+            if(!creatorUser){
+                return message.channel.send("A megadott creator nem található.");
+            }
+
+            try{
+                const rewardId = await createReward({
+                    guildId: message.guild.id,
+                    creatorId: creatorUser.id,
+                    rewardName: rewardName,
+                    rewardDescription: rewardDescription,
+                    pointCost: pointCost
+                });
+
+                await message.channel.send(
+                    `Új jutalom létrehozva.\n` +
+                    `ID: **${rewardId}**\n` +
+                    `Név: **${rewardName}**\n` +
+                    `Leírás: **${rewardDescription}**\n` +
+                    `Pont: **${pointCost}**\n` +
+                    `Tulajdonos: **${creatorUser.username}**`
+                );
+
+                await logInfo(
+                    `Új jutalom létrehozva | id:${rewardId} | név:${rewardName} | pont:${pointCost} | creator:${creatorUser.username} (${creatorUser.id}) | létrehozó:${message.author.username}`,
+                    "info"
+                );
+
+            }catch(error){
+                console.error("Hiba az addjutalom parancsnál:", error);
+                await logError(error, "Hiba az addjutalom parancsnál");
+                return message.channel.send("Hiba történt a jutalom létrehozása közben.");
+            }
+        }
+    },
+    {
+        name : 'removejutalom',
+        description : 'Jutalom törlése. Használat: !removejutalom; jutalom_id',
+        permissionLevel : 'mod',
+
+        async prefix(message, args){
+            const raw = args.join(" ").trim();
+
+            if(!raw){
+                return message.channel.send(
+                    'Használat:\n!removejutalom; jutalom_id'
+                );
+            }
+
+            const parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
+
+            if(parts.length < 1){
+                return message.channel.send(
+                    'Használat:\n!removejutalom; jutalom_id'
+                );
+            }
+
+            const rewardId = parseInt(parts[0], 10);
+
+            if(isNaN(rewardId) || rewardId < 1){
+                return message.channel.send("Hibás jutalom ID.");
+            }
+
+            try{
+                const reward = await getRewardById(message.guild.id, rewardId);
+
+                if(!reward){
+                    return message.channel.send(`Nem található jutalom ezzel az ID-val: **${rewardId}**`);
+                }
+
+                const admin = await isAdmin(message.member);
+                const isRewardOwner = reward.creator_id === message.author.id;
+
+                if(!admin && !isRewardOwner){
+                    return message.channel.send(
+                        "Ehhez nincs jogosultságod. Más jutalmát csak admin törölheti."
+                    );
+                }
+
+                const result = await deleteReward(message.guild.id, rewardId);
+
+                if(!result || result.changes === 0){
+                    return message.channel.send(`A jutalom törlése nem sikerült. ID: **${rewardId}**`);
+                }
+
+                await message.channel.send(
+                    `Jutalom törölve.\n` +
+                    `ID: **${rewardId}**\n` +
+                    `Név: **${reward.reward_name}**\n` +
+                    `Pont: **${reward.point_cost}**`
+                );
+
+                await logInfo(
+                    `Jutalom törölve | rewardId:${rewardId} | rewardName:${reward.reward_name} | creatorId:${reward.creator_id} | törlő:${message.author.username} (${message.author.id}) | admin:${admin ? 'igen' : 'nem'}`,
+                    "info"
+                );
+
+            }catch(error){
+                console.error("Hiba a removejutalom parancsnál:", error);
+                await logError(error, "Hiba a removejutalom parancsnál");
+                return message.channel.send("Hiba történt a jutalom törlése közben.");
             }
         }
     }

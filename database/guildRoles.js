@@ -71,7 +71,7 @@ async function setRolePermission(guildId,roleId,level){
 
 async function getRolePermissions(guildId){
     return await all(`
-            SELECT roleid,permission_level
+            SELECT role_id,permission_level
             FROM bot_role_permissions
             WHERE guild_id = ?
         `,[

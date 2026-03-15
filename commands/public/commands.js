@@ -1,21 +1,24 @@
 
+//public parancsok.
 const { group } = require('node:console');
 const {isOwner, isAdmin, isMod, canUseLevel} = require('../../utilis/permissions');
 const { describe } = require('node:test');
 const { getUserById} = require('../../database/queries/users');
 const { getGuildById} = require('../../database/queries/guilds');
+const { getUserPoints } = require('../../game/quiz_game');
+const { getActiveRewards } = require('../../database/queries/rewardsjs');
 
 
-function getUserLevel(member) {
+async function getUserLevel(member) {
     if(!member || !member.guild) return 'PUBLIC';
-    if (isOwner(member.guild, member.id)) return 'OWNER';
-    if (isAdmin(member)) return 'ADMIN';
-    if (isMod(member)) return 'MOD';
+    if (isOwner(member.guild, member.user.id)) return 'OWNER';
+    if (await isAdmin(member)) return 'ADMIN';
+    if (await isMod(member)) return 'MOD';
     return 'PUBLIC';
 }
 
-function buildCommandsMessage(member, allCommands){
-    const level = getUserLevel(member);
+async function buildCommandsMessage(member, allCommands){
+    const level = await getUserLevel(member);
     const groupedCommands = {
         public: [],
         mod: [],
@@ -23,7 +26,7 @@ function buildCommandsMessage(member, allCommands){
         owner: []
     };
     for (const command of allCommands.values()){
-        if(!canUseLevel(member, command.permissionLevel)) continue;
+        if(!(await canUseLevel(member, command.permissionLevel))) continue;
         const category = (command.permissionLevel || 'public').toLowerCase();
         if(!groupedCommands[category]){
             groupedCommands[category] = [];
@@ -70,12 +73,12 @@ module.exports = [
         permissionLevel: 'public',
 
         async prefix(message, args) {
-            const level = getUserLevel(message.member);
+            const level = await getUserLevel(message.member);
             await message.channel.send(`A jogosultsági szinted: **${level}**`);
         },
 
         async slash(interaction) {
-            const level = getUserLevel(interaction.member);
+            const level = await getUserLevel(interaction.member);
             await interaction.reply(`A jogosultsági szinted: **${level}**`);
         }
     },
@@ -85,7 +88,7 @@ module.exports = [
         permissionLevel : 'public',
 
         async prefix(message,args,client){
-            const text = buildCommandsMessage(message.member, client.commands);
+            const text = await buildCommandsMessage(message.member, client.commands);
             await message.channel.send(text);
         },
         async slash(interaction, client){
@@ -157,5 +160,55 @@ module.exports = [
                                     });
                                 }
                             }
+    },
+    {
+    name : 'mypoints',
+    description : 'Megmutatja hány pontod van.',
+
+    async prefix(message){
+
+        const userId = message.author.id;
+
+        const rows = await getUserPoints(userId);
+
+        if(!rows || rows.length === 0){
+            return message.channel.send(`${message.author.username}-nek még nincs pontja.`);
+        }
+
+        let totalPoints = 0;
+        let details = "";
+
+        for(const row of rows){
+            totalPoints += row.total;
+            details += `${row.created_by} → ${row.total} pont\n`;
+        }
+
+        message.channel.send(
+            `${message.author.username}-nek összesen **${totalPoints}** pontja van.
+
+            Kapott pontok:
+            ${details}`
+                    );
+                }
+    },
+    {
+         name : 'jutalmak',
+        description: 'Ki listázza kitől milyen jutalmak vannak, mennyi pontért.',
+        permissionLevel: 'public',
+
+        async prefix(message){
+            const rewards = await getActiveRewards(message.guild.id);
+            if(!rewards || rewards.length === 0){
+                return message.channel.send("Jelenleg nincs elérhető jutalom.");
+            }
+
+            const text = rewards.map(reward => {
+                const creatorName = reward.global_name || reward.username || reward.creator_id;
+                const desc = reward.reward_description ? ` - ${reward.reward_description}` : '';
+                return `id:${reward.id} | **${reward.reward_name}** | ${reward.point_cost} pont | tőle: **${creatorName}**${desc}`;
+            }).join('\n');
+
+            await message.channel.send(`🎁 Elérhető jutalmak:\n${text}`);
+        }
     }
 ];

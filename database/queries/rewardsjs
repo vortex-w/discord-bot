@@ -1,0 +1,76 @@
+const { run, all, get } = require("../db");
+
+async function createReward(data){
+    const result = await run(`
+        INSERT INTO rewards(
+            guild_id,
+            creator_id,
+            reward_name,
+            reward_description,
+            point_cost,
+            is_active
+        )
+        VALUES(?,?,?,?,?,1)
+    `,[
+        data.guildId,
+        data.creatorId,
+        data.rewardName,
+        data.rewardDescription || null,
+        data.pointCost
+    ]);
+
+    return result.lastID;
+}
+async function getActiveRewards(guildId){
+    return await all(`
+        SELECT 
+            r.*,
+            u.username,
+            u.global_name
+        FROM rewards r
+        LEFT JOIN users u
+            ON r.creator_id = u.user_id
+        WHERE r.guild_id = ?
+        AND r.is_active = 1
+        ORDER BY r.point_cost ASC, r.reward_name COLLATE NOCASE ASC
+    `,[guildId]);
+}
+
+async function getCreatorRewards(guildId, creatorId){
+    return await all(`
+        SELECT 
+            r.*,
+            u.username,
+            u.global_name
+        FROM rewards r
+        LEFT JOIN users u
+            ON r.creator_id = u.user_id
+        WHERE r.guild_id = ?
+        AND r.creator_id = ?
+        AND r.is_active = 1
+        ORDER BY r.point_cost ASC, r.reward_name COLLATE NOCASE ASC
+    `,[guildId, creatorId]);
+}
+async function deleteReward(guildId, rewardId){
+    return await run(`
+        DELETE FROM rewards
+        WHERE guild_id = ?
+        AND id = ?
+    `,[guildId, rewardId]);
+}
+async function getRewardById(guildId, rewardId){
+    return await get(`
+        SELECT *
+        FROM rewards
+        WHERE guild_id = ?
+        AND id = ?
+        LIMIT 1
+    `,[guildId, rewardId]);
+}
+module.exports = {
+    createReward,
+    getActiveRewards,
+    getCreatorRewards,
+    deleteReward,
+    getRewardById
+};

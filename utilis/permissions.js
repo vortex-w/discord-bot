@@ -44,6 +44,8 @@ async function isMod(member){
 }
 
 async function canUseLevel(member, level = 'public'){
+    if(!member || !member.guild) return false;
+
     switch(level){
         case 'owner':
             return isOwner(member.guild, member.id);

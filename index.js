@@ -4,6 +4,7 @@
 
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
+const { syncGuildChannels } = require('./utilis/syncGuildChannels');
 const {initDatabase} = require('./database/init');
 const {saveUser} = require('./database/queries/users');
 const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
@@ -28,7 +29,7 @@ const adminCommands = require('./commands/admin/commands');
 const ownerCommands = require('./commands/owner/commands');
 const { getUserCommandPermission } = require('./database/queries/userCommandPermissions');
 const { handleQuizButton } = require('./events/quizButtonhandler');
-
+const { closeExperiedQuizzes } = require('./events/quizCloser');
 
 const allCommands = [
     ...publicCommands,
@@ -50,17 +51,25 @@ for (const command of allCommands) {
 
 client.once('clientReady', async () => {
     console.log(`Bot elindult: ${client.user.tag}`);
-    await logInfo('bot elindult');
+    
     try{
+
         await initDatabase();
         await createGuildRolesTable();
+        await logInfo('bot elindult');
         for(const guild of client.guilds.cache.values()){
             await syncGuildRoles(guild);
+            await syncGuildChannels(guild);
+            
         }
     }catch(error){
         console.error('adatbázis inicializási hiba:' , error);
         await logError(error, 'adatbázis inicializálási hiba');
     }
+    setInterval(async() => {
+        //await closeExpiriedQuizzes(client);
+        await closeExperiedQuizzes(client);
+    }, 10000);
 });
 
 client.on('messageCreate', async (message) => {

@@ -5,6 +5,10 @@ const { getUserPoints } = require('../../game/quiz_game');
 const { getCommandTargetChannel } = require('../../utilis/commandTargetChannel');
 const { getActiveRewards } = require('../../database/queries/rewardsjs');
 const { getCreatorRewards } = require('../../database/queries/rewardsjs');
+const { getOrCreateBotVersion } = require('../../database/queries/botVersion');
+const { getGithubVersion } = require('../../utilis/versionchecker');
+const { compareVersions } = require('../../utilis/versionCompare');
+const verzioCooldown = new Map();
 
 async function getUserLevel(member) {
     if (!member || !member.guild) return 'PUBLIC';
@@ -244,6 +248,60 @@ module.exports = [
             if(text.length > 0){
                 await targetChannel.send(text);
             }
+        }
+    },
+    {
+        name: 'verzio',
+        description: 'Kiírja a bot jelenlegi és GitHubon elérhető verzióját.',
+        permissionLevel: 'public',
+
+        async prefix(message){
+            const userId = message.author.id;
+
+            // ⏱ cooldown ellenőrzés
+            if(verzioCooldown.has(userId)){
+                const last = verzioCooldown.get(userId);
+                const now = Date.now();
+
+                if(now - last < 5000){
+                    return message.reply("⏳ Várj egy kicsit mielőtt újra használod ezt a parancsot.");
+                }
+            }
+
+            // idő frissítés
+            verzioCooldown.set(userId, Date.now());
+
+            const dbVersion = await getOrCreateBotVersion(message.guild.id);
+            const github = await getGithubVersion();
+
+            const result = compareVersions(
+                dbVersion.current_version,
+                github.version
+            );
+
+            let statusText = "";
+
+            if(result.type === 'same'){
+                statusText = "✅ A bot naprakész.";
+            }else if(result.type === 'patch'){
+                statusText = "ℹ️ Kisebb javítás elérhető, de nem szükséges frissíteni.";
+            }else if(result.type === 'minor'){
+                statusText = "ℹ️ Nagyobb hibajavítás elérhető, de még nem kötelező frissíteni.";
+            }else if(result.type === 'recommended'){
+                statusText = "⚠️ Ajánlott frissítés elérhető.";
+            }else if(result.type === 'major'){
+                statusText = "🚨 Nagy frissítés elérhető.";
+            }else{
+                statusText = "❓ Ismeretlen verzióállapot.";
+            }
+
+            await message.reply(
+                `📦 Bot verzió állapot\n\n` +
+                `Saját verzió: ${dbVersion.current_version}\n` +
+                `GitHub verzió: ${github.version}\n` +
+                `Állapot: ${statusText}\n\n` +
+                `GitHub üzenet: ${github.message || "Nincs megadva."}`
+            );
         }
     }
 ];

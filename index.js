@@ -1,7 +1,6 @@
-//V5 verzó asdasd
-//teszt elem V6
- require('dotenv').config();
 
+ require('dotenv').config();
+var teszt_mode = false;
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
 const { syncGuildChannels } = require('./utilis/syncGuildChannels');
@@ -30,6 +29,9 @@ const { getUserCommandPermission } = require('./database/queries/userCommandPerm
 const { handleQuizButton } = require('./events/quizButtonhandler');
 const { closeExperiedQuizzes } = require('./events/quizCloser');
 const { getCommandChannels } = require('./database/queries/commandChannels');
+const { getOrCreateBotVersion, updateBotVersionCheck, updateBotVersionNotify } = require('./database/queries/botVersion');
+const { compareVersions } = require('./utilis/versionCompare');
+const { getGithubVersion } = require('./utilis/versionchecker');
 
 const allCommands = [
     ...publicCommands,
@@ -48,7 +50,140 @@ for (const command of allCommands) {
     client.commands.set(command.name, command);
     
 }
+function isOlderThanDays(dateText, days){
+    if(!dateText) return true;
 
+    const lastDate = new Date(dateText);
+    const now = new Date();
+
+    const diffMs = now - lastDate;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    return diffDays >= days;
+}
+
+function getVersionMessage(localVersion, githubVersion, resultType){
+    if(resultType === 'recommended'){
+        return `⚠️ Ajánlott bot frissítés elérhető!\n\nJelenlegi verzió: ${localVersion}\nElérhető verzió: ${githubVersion}\n\nEz már olyan szintű frissítés, amit érdemes letölteni GitHubról.`;
+    }
+
+    if(resultType === 'major'){
+        return `🚨 Nagy bot frissítés elérhető!\n\nJelenlegi verzió: ${localVersion}\nElérhető verzió: ${githubVersion}\n\nEz főverzió váltás, ajánlott mielőbb frissíteni.`;
+    }
+
+    return null;
+}
+
+function getNotifyChannel(guild){
+    if(guild.systemChannel){
+        return guild.systemChannel;
+    }
+
+    return guild.channels.cache.find(channel =>
+        channel.isTextBased &&
+        channel.isTextBased() &&
+        channel.permissionsFor(guild.members.me).has('SendMessages')
+    );
+}
+async function sendVersionNotify(guild, message){
+    try{
+        const owner = await guild.fetchOwner();
+
+        if(owner && owner.user){
+            await owner.user.send(message);
+            console.log("Verzió értesítés elküldve privátban:", owner.user.tag);
+            return true;
+        }
+    }catch(error){
+        console.log("Nem sikerült privát üzenetet küldeni a szerver tulajnak:", error.message);
+    }
+
+    const channel = getNotifyChannel(guild);
+
+    if(channel){
+        await channel.send(message);
+        console.log("Verzió értesítés elküldve csatornába:", channel.name);
+        return true;
+    }
+
+    console.log("Nem volt elérhető értesítési hely:", guild.name);
+    return false;
+}
+async function checkBotVersions(client){
+    console.log("Verzióellenőrzés indul...");
+
+    const github = await getGithubVersion();
+
+    for(const guild of client.guilds.cache.values()){
+        const dbVersion = await getOrCreateBotVersion(guild.id);
+
+        await updateBotVersionCheck(guild.id);
+
+        const result = compareVersions(
+            dbVersion.current_version,
+            github.version
+        );
+
+        console.log(
+            guild.name,
+            dbVersion.current_version,
+            "→",
+            github.version,
+            "=>",
+            result.type
+        );
+
+        // csak recommended / major esetén foglalkozunk vele
+        if(result.type !== 'recommended' && result.type !== 'major'){
+            continue;
+        }
+
+        // heti 1 értesítés
+        if(!isOlderThanDays(dbVersion.last_notified_at, 7)){
+            console.log("Már volt értesítés 7 napon belül:", guild.name);
+            continue;
+        }
+
+        const message = getVersionMessage(
+            dbVersion.current_version,
+            github.version,
+            result.type
+        );
+
+        // 👉 új logika: először DM a tulajnak
+        let sent = false;
+
+        try{
+            const owner = await guild.fetchOwner();
+
+            if(owner && owner.user){
+                await owner.user.send(message);
+                console.log("Verzió értesítés elküldve privátban:", owner.user.tag);
+                sent = true;
+            }
+        }catch(error){
+            console.log("Nem sikerült privát üzenetet küldeni a szerver tulajnak:", error.message);
+        }
+
+        // 👉 fallback: csatorna
+        if(!sent){
+            const channel = getNotifyChannel(guild);
+
+            if(channel){
+                await channel.send(message);
+                console.log("Verzió értesítés elküldve csatornába:", channel.name);
+                sent = true;
+            }else{
+                console.log("Nincs elérhető csatorna:", guild.name);
+            }
+        }
+
+        // 👉 ha bárhova ment, frissítjük
+        if(sent){
+            await updateBotVersionNotify(guild.id);
+        }
+    }
+}
 client.once('clientReady', async () => {
     console.log(`Bot elindult: ${client.user.tag}`);
     
@@ -60,7 +195,24 @@ client.once('clientReady', async () => {
         for(const guild of client.guilds.cache.values()){
             await syncGuildRoles(guild);
             await syncGuildChannels(guild);
-            
+            await getOrCreateBotVersion(guild.id);
+            if(teszt_mode){
+                const dbVersion = await getOrCreateBotVersion(guild.id);
+                const github = await getGithubVersion();
+                const result = compareVersions(
+                    dbVersion.current_version,
+                    github.version
+                );
+
+                console.log(
+                    guild.name,
+                    dbVersion.current_version,
+                    "→",
+                    github.version,
+                    "=>",
+                    result.type
+                );
+            }
         }
     }catch(error){
         console.error('adatbázis inicializási hiba:' , error);
@@ -94,10 +246,15 @@ client.once('clientReady', async () => {
         }, delay);
     }
     scheduleDailyTask(async () => {
-        console.log("Napi frissítés ellenőrzés (06:00)");
-        
-        // ide jön majd a logika később
+         try{
+            console.log("Napi frissítés ellenőrzés (06:00)");
+            await checkBotVersions(client);
+        }catch(error){
+            console.error("Verzióellenőrzési hiba:", error);
+            await logError(error, "Verzióellenőrzési hiba");
+        }
     });
+    //await checkBotVersions(client);
 });
 
 client.on('messageCreate', async (message) => {

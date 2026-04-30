@@ -1,3 +1,6 @@
+
+
+
 //Admin parancsok
 const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
 const { getGuildChannels, getGuildChannelByName } = require('../../database/queries/guildChannels');
@@ -8,7 +11,12 @@ const { logInfo, logError, logWarn, getLogsBetween ,  deleteAllLogs,
     getLogsByDate} = require('../../database/logger');
 const {addCommandChannel, getAllCommandChannelRules, getCommandChannels, removeCommandChannel} = require( '../../database/queries/commandChannels');
 const {getCommandTargetChannel} = require('../../utilis/commandTargetChannel');
-
+const { 
+    getOrCreateBotVersion,
+    updateCurrentBotVersion 
+} = require("../../database/queries/botVersion");
+const { getGithubVersion } = require("../../utilis/versionchecker");
+const { compareVersions } = require("../../utilis/versionCompare");
 module.exports = [
     {
         name: 'adminping',
@@ -511,6 +519,52 @@ module.exports = [
             }catch (err){
                 await logError(err,'Hiba a feltöltés vagy törlés során');
             }
+        }
+    },
+    {
+        name: 'verziofrissitve',
+        description: 'Beállítja a bot jelenlegi verzióját. Használat: !verziofrissitve V1.4.0',
+        permissionLevel: 'admin',
+
+        async prefix(message, args){
+            const targetChannel = await getCommandTargetChannel(message, 'verziofrissitve');
+
+            const version = args[0];
+
+            if(!version){
+                return targetChannel.send("Használat: `!verziofrissitve V1.4.0`");
+            }
+
+            if(!/^V\d+\.\d+\.\d+$/i.test(version)){
+                return targetChannel.send("Hibás verzió formátum. Példa: `V1.4.0`");
+            }
+
+            const cleanVersion = version.toUpperCase();
+
+            await getOrCreateBotVersion(message.guild.id);
+            await updateCurrentBotVersion(message.guild.id, cleanVersion);
+
+            const github = await getGithubVersion();
+
+            const result = compareVersions(
+                cleanVersion,
+                github.version
+            );
+
+            let statusText = "";
+
+            if(result.type === 'same'){
+                statusText = "✅ A bot verziója most naprakész.";
+            }else{
+                statusText = `ℹ️ Beállítva, de a GitHub verzió jelenleg: ${github.version}`;
+            }
+
+            await targetChannel.send(
+                `✅ Verzió frissítve az adatbázisban.\n\n` +
+                `Új helyi verzió: ${cleanVersion}\n` +
+                `GitHub verzió: ${github.version}\n` +
+                `${statusText}`
+            );
         }
     }
 ];

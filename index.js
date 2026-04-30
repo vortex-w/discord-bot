@@ -70,6 +70,34 @@ client.once('clientReady', async () => {
         //await closeExpiriedQuizzes(client);
         await closeExperiedQuizzes(client);
     }, 10000);
+    function scheduleDailyTask(task) {
+        const now = new Date();
+
+        const next = new Date();
+        next.setHours(6, 0, 0, 0); // 06:00
+
+        // ha már elmúlt ma 6:00 → holnapra állítjuk
+        if (now >= next) {
+            next.setDate(next.getDate() + 1);
+        }
+
+        const delay = next - now;
+
+        console.log(`Következő futás: ${next}`);
+
+        setTimeout(() => {
+            task();
+
+            // innentől már fix 24 óránként
+            setInterval(task, 24 * 60 * 60 * 1000);
+
+        }, delay);
+    }
+    scheduleDailyTask(async () => {
+        console.log("Napi frissítés ellenőrzés (06:00)");
+        
+        // ide jön majd a logika később
+    });
 });
 
 client.on('messageCreate', async (message) => {

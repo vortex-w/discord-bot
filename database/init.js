@@ -157,6 +157,20 @@ async function initDatabase(){
                     UNIQUE(guild_id, user_id)
                 )
             `);
+            await run(
+                `
+                CREATE TABLE IF NOT EXISTS bot_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                current_version TEXT NOT NULL DEFAULT 'V1.0.0',
+                last_checked_at TEXT,
+                last_notified_at TEXT,
+                created_at TEXT DEFAULT (datetime('now','localtime')),
+                updated_at TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(guild_id)
+            );
+                `
+            );
             console.log('SQLite táblák létrehozva, vagy már léteznek');
 }
 

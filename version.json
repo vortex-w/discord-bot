@@ -1,5 +1,5 @@
 {
     "version": "V1.0.2",
-    "updated_at": "2026-04-30T10:04:34.761Z",
-    "message": "V1.0.2 verzió kezelés tesztelése"
+    "updated_at": "2026-04-30T11:33:36.047Z",
+    "message": "V1.0.2\n\nVerzió kezelés hozzáadása. új parancsok:\n!verzio\n!verziofrissites"
 }

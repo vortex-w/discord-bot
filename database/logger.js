@@ -105,9 +105,57 @@ async function getLogsBetween(start,end){
             start,end
         ]);
 }
+
+async function deleteAllLogs(){
+    return await run(`
+        DELETE FROM logs
+    `);
+}
+
+async function deleteLastLog(){
+    return await run(`
+        DELETE FROM logs
+        WHERE id = (
+            SELECT id
+            FROM logs
+            ORDER BY id DESC
+            LIMIT 1
+        )
+    `);
+}
+
+async function deleteLogsByDate(date){
+    return await run(`
+        DELETE FROM logs
+        WHERE date(created_at) = ?
+    `, [date]);
+}
+
+async function getLastLog(){
+    return await get(`
+        SELECT *
+        FROM logs
+        ORDER BY id DESC
+        LIMIT 1
+    `);
+}
+
+async function getLogsByDate(date){
+    return await all(`
+        SELECT *
+        FROM logs
+        WHERE date(created_at) = ?
+        ORDER BY id ASC
+    `, [date]);
+}
 module.exports = {
     logError,
     logInfo,
     logWarn,
-    getLogsBetween
+    getLogsBetween,
+    deleteAllLogs,
+    deleteLastLog,
+    deleteLogsByDate,
+    getLogsByDate,
+    getLastLog
 };

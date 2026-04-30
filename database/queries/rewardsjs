@@ -67,6 +67,8 @@ async function getRewardById(guildId, rewardId){
         LIMIT 1
     `,[guildId, rewardId]);
 }
+
+
 module.exports = {
     createReward,
     getActiveRewards,

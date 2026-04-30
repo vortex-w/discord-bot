@@ -242,6 +242,63 @@ async function removeQuizPoint(guildId, userId, creatorId, amount = 1){
     `, [amount, amount, guildId, userId, creatorId]);
 }
 
+async function addRankPoint(guildId, userId, userName, amount = 1){
+    await run(`
+        INSERT INTO user_rank_points(
+            guild_id,
+            user_id,
+            user_name,
+            total_points,
+            updated_at
+        )
+        VALUES(?,?,?,?, datetime('now','localtime'))
+        ON CONFLICT(guild_id, user_id)
+        DO UPDATE SET
+            total_points = total_points + excluded.total_points,
+            user_name = excluded.user_name,
+            updated_at = datetime('now','localtime')
+    `,[guildId, userId, userName, amount]);
+}
+async function getRankList(guildId, limit = 10){
+    return await all(`
+        SELECT 
+            user_id,
+            user_name,
+            total_points
+        FROM user_rank_points
+        WHERE guild_id = ?
+        ORDER BY total_points DESC, user_name COLLATE NOCASE ASC
+        LIMIT ?
+    `,[guildId, limit]);
+}
+async function getUserRankPoints(guildId, userId){
+    return await get(`
+        SELECT 
+            user_id,
+            user_name,
+            total_points
+        FROM user_rank_points
+        WHERE guild_id = ?
+        AND user_id = ?
+        LIMIT 1
+    `,[guildId, userId]);
+}
+async function getUserRankPosition(guildId, userId){
+    const row = await get(`
+        SELECT COUNT(*) + 1 as position
+        FROM user_rank_points
+        WHERE guild_id = ?
+        AND total_points > (
+            SELECT total_points
+            FROM user_rank_points
+            WHERE guild_id = ?
+            AND user_id = ?
+        )
+    `,[guildId, guildId, userId]);
+
+    return row?.position || 1;
+}
+
 module.exports = {
     createQuizGame,
     createQuizAnswer,
@@ -261,5 +318,9 @@ module.exports = {
     getCorrectVoters,
     getUserPoints,
     getAllUserPoints,
-    removeQuizPoint
+    removeQuizPoint,
+    addRankPoint,
+    getRankList,
+    getUserRankPoints,
+    getUserRankPosition
 };

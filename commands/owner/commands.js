@@ -1,3 +1,4 @@
+const { getCommandTargetChannel } = require('../../utilis/commandTargetChannel');
 
 module.exports = [
     {
@@ -6,7 +7,8 @@ module.exports = [
         permissionLevel: 'owner',
 
         async prefix(message, args) {
-            await message.channel.send('owner pong');
+            const targetChannel = await getCommandTargetChannel(message, 'ownerping');
+            await targetChannel.send('owner pong');
         },
 
         async slash(interaction) {

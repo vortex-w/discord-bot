@@ -146,6 +146,17 @@ async function initDatabase(){
                     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
                 )
             `);
+            await run(`
+                CREATE TABLE IF NOT EXISTS user_rank_points(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    user_name TEXT NOT NULL,
+                    total_points INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    UNIQUE(guild_id, user_id)
+                )
+            `);
             console.log('SQLite táblák létrehozva, vagy már léteznek');
 }
 

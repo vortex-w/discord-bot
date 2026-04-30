@@ -1,7 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 const { logError, logInfo } = require("../database/logger");
-const { getExpiredActiveQuizzes, closeQuizById, getQuizAnswers, getQuizVoteCounts, getCorrectVoters, addQuizPoint } = require("../game/quiz_game");
-
+const { getExpiredActiveQuizzes, closeQuizById, getQuizAnswers, getQuizVoteCounts, getCorrectVoters, addQuizPoint, addRankPoint } = require("../game/quiz_game");
 function buildDisabledButtons(quizId,answers){
     const row = new ActionRowBuilder();
 
@@ -52,6 +51,12 @@ async function closeExperiedQuizzes(client){
                             voter.user_id,
                             voter.user_name,
                             quiz.creator_id
+                        );
+                        await addRankPoint(
+                            quiz.guild_id,
+                            voter.user_id,
+                            voter.user_name,
+                            1
                         );
                     }
                  const correctAnswers = voteCounts.filter(a => a.is_correct === 1);

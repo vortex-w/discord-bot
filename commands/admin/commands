@@ -1,11 +1,13 @@
-
-
-
 //Admin parancsok
 const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
 const { getGuildChannels, getGuildChannelByName } = require('../../database/queries/guildChannels');
-const { logInfo, logError, logWarn, getLogsBetween } = require('../../database/logger');
+const { logInfo, logError, logWarn, getLogsBetween ,  deleteAllLogs,
+    deleteLastLog,
+    deleteLogsByDate,
+    getLastLog,
+    getLogsByDate} = require('../../database/logger');
 const {addCommandChannel, getAllCommandChannelRules, getCommandChannels, removeCommandChannel} = require( '../../database/queries/commandChannels');
+const {getCommandTargetChannel} = require('../../utilis/commandTargetChannel');
 
 module.exports = [
     {
@@ -14,7 +16,8 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message, args) {
-            await message.channel.send('admin pong');
+            const targetChannel = await getCommandTargetChannel(message, 'adminping');
+            await targetChannel.send('admin pong');
         },
 
         async slash(interaction) {
@@ -31,13 +34,15 @@ module.exports = [
         description: 'Létre hoz egy log info bejegyzést az adatbázisban a logolás tesztelésével.',
         permissionLevel: 'admin',
         async prefix(message,args){
+            const targetChannel = await getCommandTargetChannel(message, 'logteszt');
+
             await logInfo('Teszt üzenet',{
                 user_id: message.author.id,
                 user_name: message.author.username,
                 guild_id: message.guild.id,
                 guild_name: message.guild.name
             });
-            await message.channel.send('Log bejegyzés létrehozva.');
+            await targetChannel.send('Log bejegyzés létrehozva.');
         },
         async slash(interaction){
             await interaction.reply({
@@ -57,59 +62,46 @@ module.exports = [
         description: 'Dátumon belül ki listáza a log eredményeit.',
         permissionLevel: 'admin',
         async prefix(message, args){
-            //console.log("itt vagyunk");
+            const targetChannel = await getCommandTargetChannel(message, 'loglist');
+
             let start = "";
-            let start_time ="";
             let end = "";
-            let end_time = "";
+
             if(!args[0]){
-                await message.channel.send("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
+                await targetChannel.send("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
                 return;
             }
+
             if(!args[1]){
-                start = args[0];
-                start = start + " 00:00:00";
-                end = args[0];
-                end = end + " 23:59:59";
+                start = args[0] + " 00:00:00";
+                end = args[0] + " 23:59:59";
             }else if(!args[2]){
-                start = args[0];
-                start = start + " " + args[1];
-                end = args[0];
-                end = end + " 23:59:59";
+                start = args[0] + " " + args[1];
+                end = args[0] + " 23:59:59";
             }
             else if(!args[3]){
-                start = args[0];
-                start = start + " " + args[1];
-                end = args[2];
-                end = end + " 23:59:59";
+                start = args[0] + " " + args[1];
+                end = args[2] + " 23:59:59";
             }else {
-                start = args[0];
-                start = start + " " + args[1];
-                end = args[2];
-                end = end + " " + args[3];
+                start = args[0] + " " + args[1];
+                end = args[2] + " " + args[3];
             }
-            //console.log(args[0],args[1],args[2],args[3]);
-            //console.log(start.length);
-            
-            
 
             const logs = await getLogsBetween(start,end);
-            //console.log("start:", start, "end:",end);
+
             if(!logs.length){
-                await message.channel.send("nincs log ebben az időszakban");
+                await targetChannel.send("nincs log ebben az időszakban");
                 return;
-                
             }
 
             let text = "logok: \n\n";
             for(const log of logs.slice(0,10)){
-                text +=`[${log.created_at}]${log.type} - ${log.message}\n`;
+                text += `[${log.created_at}]${log.type} - ${log.message}\n`;
             }
 
-            await message.channel.send("```"+text+"```");
+            await targetChannel.send("```"+text+"```");
         },
         async slash(interaction){
-
             const startDate = interaction.options.getString('start');
             const endDate = interaction.options.getString('end') || startDate;
 
@@ -144,18 +136,106 @@ module.exports = [
                 content: "```"+text+"```",
                 ephemeral: true
             });
-
         }
     },
     {
         name: 'deletelog',
-        description : 'Kitörli egy lognaplót, vagy adott log elemet',
+        description : 'Kitörli az összes, a legutolsó, vagy egy adott napi logot. Használat: !deletelog all | last | 2026-03-21',
         permissionLevel : 'admin',
 
-        async prefix(message,args){
-            await message.channel.send("Jelenleg még nem él ez a funkció!");
-            await logInfo('Egy admin törölni akarta a logbejegyzést, de nem sikerült, mert ez a parancs még nem él! Commands/admin/commands');
+        async prefix(message, args){
+            const targetChannel = await getCommandTargetChannel(message, 'deletelog');
+            const mode = (args[0] || "").trim();
 
+            if(!mode){
+                return targetChannel.send(
+                    'Használat:\n' +
+                    '!deletelog all\n' +
+                    '!deletelog last\n' +
+                    '!deletelog 2026-03-21'
+                );
+            }
+
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+            try{
+                if(mode === "all"){
+                    const result = await deleteAllLogs();
+
+                    await targetChannel.send(
+                        `Az összes log törölve lett. Törölt elemek száma: **${result?.changes || 0}**`
+                    );
+
+                    await logInfo(
+                        `Admin log törlés | mód: all | törlő: ${message.author.username} (${message.author.id})`,
+                        "info"
+                    );
+
+                    return;
+                }
+
+                if(mode === "last"){
+                    const lastLog = await getLastLog();
+
+                    if(!lastLog){
+                        return targetChannel.send("Nincs törölhető log bejegyzés.");
+                    }
+
+                    const result = await deleteLastLog();
+
+                    if(!result || result.changes === 0){
+                        return targetChannel.send("A legutolsó log törlése nem sikerült.");
+                    }
+
+                    await targetChannel.send(
+                        `A legutolsó log törölve lett.\n` +
+                        `ID: **${lastLog.id}**\n` +
+                        `Típus: **${lastLog.type}**\n` +
+                        `Dátum: **${lastLog.created_at}**`
+                    );
+
+                    await logInfo(
+                        `Admin log törlés | mód: last | törölt log id: ${lastLog.id} | törlő: ${message.author.username} (${message.author.id})`,
+                        "info"
+                    );
+
+                    return;
+                }
+
+                if(dateRegex.test(mode)){
+                    const logs = await getLogsByDate(mode);
+
+                    if(!logs || logs.length === 0){
+                        return targetChannel.send(`Nincs log ezen a napon: **${mode}**`);
+                    }
+
+                    const result = await deleteLogsByDate(mode);
+
+                    await targetChannel.send(
+                        `A(z) **${mode}** napi logok törölve lettek. Törölt elemek száma: **${result?.changes || 0}**`
+                    );
+
+                    await logInfo(
+                        `Admin log törlés | mód: dátum | dátum: ${mode} | törölt elemek: ${result?.changes || 0} | törlő: ${message.author.username} (${message.author.id})`,
+                        "info"
+                    );
+
+                    return;
+                }
+
+                return targetChannel.send(
+                    'Hibás paraméter.\n' +
+                    'Használat:\n' +
+                    '!deletelog all\n' +
+                    '!deletelog last\n' +
+                    '!deletelog 2026-03-21'
+                );
+
+            }catch(error){
+                console.error("Hiba a deletelog parancsnál:", error);
+                await logError(error, "Hiba a deletelog parancsnál");
+                return targetChannel.send("Hiba történt a log törlése közben.");
+            }
         }
     },
     {
@@ -164,18 +244,20 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message,args){
-            if(args[0] && args[0]==="help"){
-                message.channel.send(this.description);
+            const targetChannel = await getCommandTargetChannel(message, 'ranglekerdezes');
+
+            if(args[0] && args[0] === "help"){
+                await targetChannel.send(this.description);
             }else{
                 const roles = await getGuildRoles(message.guild.id);
                 if(!roles.length){
-                    return message.channel.send("Nincs adat az adatbázisban.");
+                    return targetChannel.send("Nincs adat az adatbázisban.");
                 }
                 let text = "Szerver rangok az adatbázisból:\n\n";
                 for(const role of roles){
                     text += `${role.role_name} | ${role.role_id} | pos:${role.role_position}\n`;
                 }
-                message.channel.send("```"+text+"```");
+                await targetChannel.send("```"+text+"```");
             }
         }
     },
@@ -185,20 +267,22 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message,args){
+            const targetChannel = await getCommandTargetChannel(message, 'setrole');
             const allowedLevels = ['public', 'mod', 'admin', 'owner'];
             const role = message.mentions.roles.first();
             const level = args[1]?.toLowerCase();
+
             if(!role){
-                return message.channel.send("Adj meg egy rangot. Pl: !setrole @moderátor mod");
+                return targetChannel.send("Adj meg egy rangot. Pl: !setrole @moderátor mod");
             }
             if(!level){
-                return message.channel.send("Adj meg egy jogosultsági szintent.");
+                return targetChannel.send("Adj meg egy jogosultsági szintent.");
             }
             if(!allowedLevels.includes(level)){
-                return message.channel.send("Érvénytelen jogosultsági szint. Lehet: public, mod, admin, owner");
+                return targetChannel.send("Érvénytelen jogosultsági szint. Lehet: public, mod, admin, owner");
             }
             await setRolePermission(message.guild.id,role.id,level);
-            message.channel.send(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
+            await targetChannel.send(`A **${role.name}** rang mostantól **${level}** jogosultságú`);
         }
     },
     {
@@ -207,13 +291,15 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message,args){
+            const targetChannel = await getCommandTargetChannel(message, 'parancstarsitas');
             const user = message.mentions.users.first();
             const commandName = args[1]?.toLowerCase();
+
             if(!user){
-                return message.channel.send("Adj meg egy felhasználót. Példa: !parancstarsitas @user parancs");
+                return targetChannel.send("Adj meg egy felhasználót. Példa: !parancstarsitas @user parancs");
             }
             if(!commandName){
-                return message.channel.send("Adj meg egy parancsnevet.");
+                return targetChannel.send("Adj meg egy parancsnevet.");
             }
 
             await setUserCommandPermission(
@@ -222,7 +308,7 @@ module.exports = [
                 commandName,
                 1
             );
-            message.channel.send(`A **${user.username} ** mostantól használhatja a **${commandName}** parancsot`);
+            await targetChannel.send(`A **${user.username}** mostantól használhatja a **${commandName}** parancsot`);
         }
     },
     {
@@ -231,53 +317,61 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message,args){
+            const targetChannel = await getCommandTargetChannel(message, 'parancsmegvonas');
             const user = message.mentions.users.first();
             const commandName = args[1]?.toLowerCase();
+
             if(!user){
-                return message.channel.send("Adj meg egy felhasználót. Példa: !parancsmegvonas @user parancs");
+                return targetChannel.send("Adj meg egy felhasználót. Példa: !parancsmegvonas @user parancs");
             }
             if(!commandName){
-                return message.channel.send("Adj meg egy parancsnevet.");
+                return targetChannel.send("Adj meg egy parancsnevet.");
             }
+
             await setUserCommandPermission(
                 message.guild.id,
                 user.id,
                 commandName,
                 0
             );
-            message.channel.send(`A **${user.username} ** mostantól nem használhatja a **${commandName}** parancsot`);
+            await targetChannel.send(`A **${user.username}** mostantól nem használhatja a **${commandName}** parancsot`);
         }
     },
     {
         name : 'tagjogok',
         description : 'Adott tagnak megmutatja milyen extra parancsai vannak',
         permissionLevel :'admin',
+
         async prefix(message, args){
+            const targetChannel = await getCommandTargetChannel(message, 'tagjogok');
             const user = message.mentions.users.first();
 
             if(!user){
-                return message.channel.send("Adj meg egy felhasználót. Példa: !tagjogok @user");
+                return targetChannel.send("Adj meg egy felhasználót. Példa: !tagjogok @user");
             }
+
             const perms = await getUserCommandPermission(
                 message.guild.id,
                 user.id
             ) || [];
-            //console.log(perms);
+
             if(!perms.length){
-                return message.channel.send(`${user.username} nem rendelkezik extra parancsokkal.`);
+                return targetChannel.send(`${user.username} nem rendelkezik extra parancsokkal.`);
             }
+
             let text = `${user.username} extra parancsai:\n\n`;
             let state = "";
-            
+
             for(const perm of perms){
-                if(perm.allowed==1){
-                state = "igen";
+                if(perm.allowed == 1){
+                    state = "igen";
                 }else{
                     state = "Nem";
                 }
                 text += `${perm.command_name} Aktív:${state}\n`;
             }
-            message.channel.send("```"+text+"```");
+
+            await targetChannel.send("```"+text+"```");
         }
     },
     {
@@ -286,26 +380,41 @@ module.exports = [
         permissionLevel: 'admin',
 
         async prefix(message, args){
-            message.channel.send("Használhatod ezt a parancsot");
+            const targetChannel = await getCommandTargetChannel(message, 'teszt_command');
+            await targetChannel.send("Használhatod ezt a parancsot");
         }
     },
     {
         name : 'csatornalista',
-        description : 'Ki listázza a csatornák neveit és típusait.',
+        description : 'Kilistázza a csatornák neveit és típusait.',
         permissionLevel: 'admin',
 
         async prefix(message){
-           const channels = await getGuildChannels(message.guild.id);
+            const targetChannel = await getCommandTargetChannel(message, 'csatornalista');
+            const channels = await getGuildChannels(message.guild.id);
 
-           if(!channels || channels.length === 0){
-            return message.channel.send("Nincsenek csatornák eltárolva az adatbázisba");
-           }
+            if(!channels || channels.length === 0){
+                return targetChannel.send("Nincsenek csatornák eltárolva az adatbázisban.");
+            }
 
-           const list = channels
-                .map(channel => `${channel.channel_name} | ${channel.channel_id} | ${channel.channel_type}`)
-                .join('\n');
+            const lines = channels.map(channel =>
+                `${channel.channel_name} | ${channel.channel_id} | ${channel.channel_type}`
+            );
 
-                await message.channel.send(`Csatornák adatbázisból:\n${list}`);
+            let text = "Csatornák adatbázisból:\n";
+
+            for(const line of lines){
+                if((text + line + "\n").length > 1900){
+                    await targetChannel.send(text);
+                    text = "";
+                }
+
+                text += line + "\n";
+            }
+
+            if(text.length > 0){
+                await targetChannel.send(text);
+            }
         }
     },
     {
@@ -314,9 +423,11 @@ module.exports = [
         permissionLevel : 'admin',
 
         async prefix(message, args, client){
+            const targetChannel = await getCommandTargetChannel(message, 'setcsatorna');
             const raw = args.join(" ").trim();
+
             if(!raw){
-                return message.channel.send(
+                return targetChannel.send(
                     'Használat:\n' +
                     '!setcsatorna add; csatornanév; parancsnév\n' +
                     '!setcsatorna remove; csatornanév; parancsnév\n' +
@@ -324,67 +435,81 @@ module.exports = [
                     '!setcsatorna list'
                 );
             }
-            const parts = raw.split(";").map(p=>p.trim()).filter(p=>p.length > 0);
+
+            const parts = raw.split(";").map(p => p.trim()).filter(p => p.length > 0);
             const action = (parts[0] || "").toLowerCase();
+
             if(action === "list"){
                 const rows = await getAllCommandChannelRules(message.guild.id);
 
-                if(!rows || rows.length===0){
-                    return message.channel.send("Nincs beállított parancs-csatorna hozzárendelés.");
-                    
+                if(!rows || rows.length === 0){
+                    return targetChannel.send("Nincs beállított parancs-csatorna hozzárendelés.");
                 }
+
                 const text = rows
-                    .map(row =>`${row.command_name} --> <#${row.channel_id}>`)
+                    .map(row => `${row.command_name} --> <#${row.channel_id}>`)
                     .join("\n");
 
-                return message.channel.send(`Beállított hozzárendelések:\n${text}`);
+                return targetChannel.send(`Beállított hozzárendelések:\n${text}`);
             }
-            if(action==="show"){
+
+            if(action === "show"){
                 const commandName = parts[1];
+
                 if(!commandName){
-                    return message.channel.send("Használat: !setcsatorna show; parancsnév");
+                    return targetChannel.send("Használat: !setcsatorna show; parancsnév");
                 }
+
                 const rows = await getCommandChannels(message.guild.id, commandName);
+
                 if(!rows || rows.length === 0){
-                    return message.channel.send(`A(z) **${commandName}** parancshoz nincs csatorna rendelve.`);
+                    return targetChannel.send(`A(z) **${commandName}** parancshoz nincs csatorna rendelve.`);
                 }
+
                 const text = rows
                     .map(row => `<#${row.channel_id}>`)
                     .join("\n");
 
-                return message.channel.send(`A(z) **${commandName}** parancs csatornái:\n${text}`);
+                return targetChannel.send(`A(z) **${commandName}** parancs csatornái:\n${text}`);
             }
-            if(action !== "add" && action !=="remove"){
-                return message.channel.send("Ismeretlen művelet. Használat: add | remove | show | list");
+
+            if(action !== "add" && action !== "remove"){
+                return targetChannel.send("Ismeretlen művelet. Használat: add | remove | show | list");
             }
+
             const channelName = parts[1];
             const commandName = parts[2];
+
             if(!channelName || !commandName){
-                return message.channel.send(
+                return targetChannel.send(
                     'Használat:\n' +
                     '!setcsatorna add; csatornanév; parancsnév\n' +
                     '!setcsatorna remove; csatornanév; parancsnév'
                 );
             }
+
             if(!client.commands.has(commandName)){
-                return message.channel.send(`A(z) **${commandName}** parancs nem létezik.`);
+                return targetChannel.send(`A(z) **${commandName}** parancs nem létezik.`);
             }
+
             const channel = await getGuildChannelByName(message.guild.id, channelName);
+
             if(!channel){
-                 return message.channel.send(`A(z) **${commandName}** parancs nem létezik.`);
+                return targetChannel.send(`Nem találom ezt a csatornát az adatbázisban: **${channelName}**`);
             }
+
             try{
                 if(action === "add"){
-                
                     await addCommandChannel(message.guild.id, commandName, channel.channel_id);
-                    return message.channel.send(`A(z) **${commandName}** parancs hozzá lett rendelve ehhez: **${channel.channel_name}**`);
+                    return targetChannel.send(`A(z) **${commandName}** parancs hozzá lett rendelve ehhez: **${channel.channel_name}**`);
                 }
+
                 if(action === "remove"){
                     await removeCommandChannel(message.guild.id, commandName, channel.channel_id);
-                    return message.channel.send(`A(z) **${commandName}** parancs el lett távolítva innen: **${channel.channel_name}**`);
+                    return targetChannel.send(`A(z) **${commandName}** parancs el lett távolítva innen: **${channel.channel_name}**`);
                 }
             }catch (err){
-                logError(err,'Hiba a feltöltés vagy törlés során');
+                await logError(err,'Hiba a feltöltés vagy törlés során');
             }
         }
     }

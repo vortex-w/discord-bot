@@ -12,7 +12,6 @@ const kopapirollo = require('./game/kopapirollo');
 const {logError, logInfo, logWarn, getLogsBetween} = require('./database/logger');
 const { createGuildRolesTable,syncGuildRoles }  = require('./database/guildRoles');
 
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -30,6 +29,7 @@ const ownerCommands = require('./commands/owner/commands');
 const { getUserCommandPermission } = require('./database/queries/userCommandPermissions');
 const { handleQuizButton } = require('./events/quizButtonhandler');
 const { closeExperiedQuizzes } = require('./events/quizCloser');
+const { getCommandChannels } = require('./database/queries/commandChannels');
 
 const allCommands = [
     ...publicCommands,
@@ -102,7 +102,7 @@ client.on('messageCreate', async (message) => {
         const command = client.commands.get(commandName);
 
         if (!command) {
-            await message.reply(`Ismeretlen parancsot adtál meg: ${commandName}`);
+            //await message.reply(`Ismeretlen parancsot adtál meg: ${commandName}`);
             return;
         }
         
@@ -120,8 +120,9 @@ client.on('messageCreate', async (message) => {
                 await message.channel.send(getNoPermissionMessage(permissionLevel));
                 return;
             }
-        }
 
+        }
+        
         if (typeof command.prefix === 'function') {
             await command.prefix(message, args, client);
             

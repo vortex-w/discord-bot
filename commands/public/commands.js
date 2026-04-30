@@ -3,12 +3,98 @@ const { getUserById } = require('../../database/queries/users');
 const { getGuildById } = require('../../database/queries/guilds');
 const { getUserPoints } = require('../../game/quiz_game');
 const { getCommandTargetChannel } = require('../../utilis/commandTargetChannel');
-const { getActiveRewards } = require('../../database/queries/rewardsjs');
-const { getCreatorRewards } = require('../../database/queries/rewardsjs');
+const { getActiveRewards, getCreatorRewards } = require('../../database/queries/rewardsjs');
 const { getOrCreateBotVersion } = require('../../database/queries/botVersion');
 const { getGithubVersion } = require('../../utilis/versionchecker');
 const { compareVersions } = require('../../utilis/versionCompare');
+
 const verzioCooldown = new Map();
+
+async function sendLongMessage(channel, text){
+    const maxLength = 1900;
+
+    if(!text || text.length === 0){
+        return;
+    }
+
+    const lines = text.split('\n');
+    let chunk = '';
+
+    for(const line of lines){
+        if((chunk + line + '\n').length > maxLength){
+            if(chunk.length > 0){
+                await channel.send(chunk);
+                chunk = '';
+            }
+
+            if(line.length > maxLength){
+                for(let i = 0; i < line.length; i += maxLength){
+                    await channel.send(line.slice(i, i + maxLength));
+                }
+            }else{
+                chunk = line + '\n';
+            }
+        }else{
+            chunk += line + '\n';
+        }
+    }
+
+    if(chunk.length > 0){
+        await channel.send(chunk);
+    }
+}
+
+async function replyLongInteraction(interaction, text){
+    const maxLength = 1900;
+
+    if(text.length <= maxLength){
+        return interaction.reply({
+            content: text,
+            ephemeral: true
+        });
+    }
+
+    await interaction.reply({
+        content: 'A válasz túl hosszú, több részletben küldöm.',
+        ephemeral: true
+    });
+
+    const lines = text.split('\n');
+    let chunk = '';
+
+    for(const line of lines){
+        if((chunk + line + '\n').length > maxLength){
+            if(chunk.length > 0){
+                await interaction.followUp({
+                    content: chunk,
+                    ephemeral: true
+                });
+
+                chunk = '';
+            }
+
+            if(line.length > maxLength){
+                for(let i = 0; i < line.length; i += maxLength){
+                    await interaction.followUp({
+                        content: line.slice(i, i + maxLength),
+                        ephemeral: true
+                    });
+                }
+            }else{
+                chunk = line + '\n';
+            }
+        }else{
+            chunk += line + '\n';
+        }
+    }
+
+    if(chunk.length > 0){
+        await interaction.followUp({
+            content: chunk,
+            ephemeral: true
+        });
+    }
+}
 
 async function getUserLevel(member) {
     if (!member || !member.guild) return 'PUBLIC';
@@ -29,15 +115,17 @@ async function buildCommandsMessage(member, allCommands) {
     };
 
     for (const command of allCommands.values()) {
-        if (!(await canUseLevel(member, command.permissionLevel))) continue;
+        const permissionLevel = command.permissionLevel || 'public';
 
-        const category = (command.permissionLevel || 'public').toLowerCase();
+        if (!(await canUseLevel(member, permissionLevel))) continue;
+
+        const category = permissionLevel.toLowerCase();
 
         if (!groupedCommands[category]) {
             groupedCommands[category] = [];
         }
 
-        groupedCommands[category].push(`!${command.name} - ${command.description}`);
+        groupedCommands[category].push(`!${command.name} - ${command.description || 'Nincs leírás'}`);
     }
 
     let text = `A jogosultsági szinted: **${level}**\n\n`;
@@ -68,7 +156,7 @@ module.exports = [
         description: 'Ping teszt',
         permissionLevel: 'public',
 
-        async prefix(message, args) {
+        async prefix(message) {
             const targetChannel = await getCommandTargetChannel(message, 'ping');
             await targetChannel.send('pong');
         },
@@ -77,12 +165,13 @@ module.exports = [
             await interaction.reply('pong');
         }
     },
+
     {
         name: 'whoami',
         description: 'Megmondja milyen jogosultságod van',
         permissionLevel: 'public',
 
-        async prefix(message, args) {
+        async prefix(message) {
             const targetChannel = await getCommandTargetChannel(message, 'whoami');
             const level = await getUserLevel(message.member);
             await targetChannel.send(`A jogosultsági szinted: **${level}**`);
@@ -90,31 +179,38 @@ module.exports = [
 
         async slash(interaction) {
             const level = await getUserLevel(interaction.member);
-            await interaction.reply(`A jogosultsági szinted: **${level}**`);
+
+            await interaction.reply({
+                content: `A jogosultsági szinted: **${level}**`,
+                ephemeral: true
+            });
         }
     },
+
     {
         name: 'parancsok',
-        description: 'Ki listázza a használható parancsokat',
+        description: 'Kilistázza a használható parancsokat',
         permissionLevel: 'public',
 
         async prefix(message, args, client) {
             const targetChannel = await getCommandTargetChannel(message, 'parancsok');
             const text = await buildCommandsMessage(message.member, client.commands);
-            await targetChannel.send(text);
+
+            await sendLongMessage(targetChannel, text);
         },
 
         async slash(interaction, client) {
             const text = await buildCommandsMessage(interaction.member, client.commands);
-            await interaction.reply(text);
+            await replyLongInteraction(interaction, text);
         }
     },
+
     {
         name: 'mydb',
         description: 'Megmutatja az adatbázisban tárolt adataidat',
         permissionLevel: 'public',
 
-        async prefix(message, args) {
+        async prefix(message) {
             const targetChannel = await getCommandTargetChannel(message, 'mydb');
 
             try {
@@ -126,7 +222,7 @@ module.exports = [
                     return;
                 }
 
-                await targetChannel.send(
+                const text =
                     `Felhasználó:\n` +
                     `ID: ${user.user_id}\n` +
                     `Név: ${user.username}\n` +
@@ -134,8 +230,9 @@ module.exports = [
                     `Szerver:\n` +
                     `ID: ${guild?.guild_id || 'nincs'}\n` +
                     `Név: ${guild?.guild_name || 'nincs'}\n` +
-                    `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`
-                );
+                    `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`;
+
+                await sendLongMessage(targetChannel, text);
             } catch (error) {
                 console.error('mydb hiba:', error);
                 await targetChannel.send('Hiba történt az adatbázis lekérdezése közben.');
@@ -150,7 +247,7 @@ module.exports = [
                 let text = '';
 
                 if (!user) {
-                    text = 'Nincs meg a user';
+                    text = 'Nincs meg a user.';
                 } else {
                     text =
                         `Felhasználó:\n` +
@@ -163,10 +260,7 @@ module.exports = [
                         `Tulaj ID: ${guild?.owner_id || 'nincs'}\n`;
                 }
 
-                await interaction.reply({
-                    content: text,
-                    ephemeral: true
-                });
+                await replyLongInteraction(interaction, text);
             } catch (error) {
                 console.error('mydb slash hiba:', error);
 
@@ -177,6 +271,7 @@ module.exports = [
             }
         }
     },
+
     {
         name: 'mypoints',
         description: 'Megmutatja hány pontod van.',
@@ -200,17 +295,20 @@ module.exports = [
                 details += `${row.created_by} → ${row.total} pont\n`;
             }
 
-            await targetChannel.send(
-                `${message.author.username}-nek összesen **${totalPoints}** pontja van.\n\n${details}`
-            );
+            const text =
+                `${message.author.username}-nek összesen **${totalPoints}** pontja van.\n\n` +
+                details;
+
+            await sendLongMessage(targetChannel, text);
         }
     },
+
     {
         name: 'jutalmak',
         description: 'Kilistázza milyen elérhető jutalmak vannak. Használat: !jutalmak vagy !jutalmak @creator',
         permissionLevel : 'public',
 
-        async prefix(message, args){
+        async prefix(message){
             const targetChannel = await getCommandTargetChannel(message, 'jutalmak');
 
             let creatorId = null;
@@ -234,22 +332,12 @@ module.exports = [
                 return `#${r.id} | ${r.reward_name} | ${r.point_cost} pont | létrehozó: ${creatorName}${desc}`;
             });
 
-            let text = "Elérhető jutalmak:\n";
+            const text = "Elérhető jutalmak:\n" + lines.join('\n');
 
-            for(const line of lines){
-                if((text + line + "\n").length > 1900){
-                    await targetChannel.send(text);
-                    text = "";
-                }
-
-                text += line + "\n";
-            }
-
-            if(text.length > 0){
-                await targetChannel.send(text);
-            }
+            await sendLongMessage(targetChannel, text);
         }
     },
+
     {
         name: 'verzio',
         description: 'Kiírja a bot jelenlegi és GitHubon elérhető verzióját.',
@@ -258,7 +346,6 @@ module.exports = [
         async prefix(message){
             const userId = message.author.id;
 
-            // ⏱ cooldown ellenőrzés
             if(verzioCooldown.has(userId)){
                 const last = verzioCooldown.get(userId);
                 const now = Date.now();
@@ -268,7 +355,6 @@ module.exports = [
                 }
             }
 
-            // idő frissítés
             verzioCooldown.set(userId, Date.now());
 
             const dbVersion = await getOrCreateBotVersion(message.guild.id);
@@ -295,13 +381,14 @@ module.exports = [
                 statusText = "❓ Ismeretlen verzióállapot.";
             }
 
-            await message.reply(
+            const text =
                 `📦 Bot verzió állapot\n\n` +
                 `Saját verzió: ${dbVersion.current_version}\n` +
                 `GitHub verzió: ${github.version}\n` +
                 `Állapot: ${statusText}\n\n` +
-                `GitHub üzenet: ${github.message || "Nincs megadva."}`
-            );
+                `GitHub üzenet: ${github.message || "Nincs megadva."}`;
+
+            await message.reply(text);
         }
     }
 ];

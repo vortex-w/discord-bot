@@ -1,5 +1,5 @@
 {
-    "version": "V1.0.4",
-    "updated_at": "2026-04-30T11:45:33.992Z",
-    "message": "V1.0.4 verzió javítás\n\nSzépséghiba kikerülése/teszt üzenet"
+    "version": "V1.0.5",
+    "updated_at": "2026-04-30T13:39:34.245Z",
+    "message": "V1.0.5\n\nLog hiba javítás. rossz válasz adás esetén is helyesnek írta a választ.\njavítva"
 }

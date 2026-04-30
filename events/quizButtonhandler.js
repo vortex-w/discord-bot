@@ -123,7 +123,7 @@ async function handleQuizButton(interaction) {
                 content : "szavazat rögzítve!",
                 ephemeral: true
             });
-            await logInfo(`Helyes szavazat | User:${userName} (${interaction.user.id}) | quiz:${quizId} | answer:${answerIndex}`,
+            await logInfo(`Szavazat | User:${userName} (${interaction.user.id}) | quiz:${quizId} | answer:${answerIndex}`,
                 "info");
 
 

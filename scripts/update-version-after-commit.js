@@ -26,4 +26,4 @@ fs.writeFileSync(
     "utf8"
 );
 
-console.log("version.json frissítve:", version);
+//console.log("version.json frissítve:", version);

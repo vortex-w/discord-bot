@@ -66,28 +66,9 @@ async function getAllCommandChannelRules(guildId){
         `,[guildId]);
 }
 
-async function getAllRewards(guildId){
-    return await all(`
-        SELECT *
-        FROM quiz_rewards
-        WHERE guild_id = ?
-        ORDER BY reward_points ASC
-    `, [guildId]);
-}
 
-async function getRewardsByCreator(guildId, creatorId){
-    return await all(`
-        SELECT *
-        FROM quiz_rewards
-        WHERE guild_id = ?
-        AND created_id = ?
-        ORDER BY reward_points ASC
-    `, [guildId, creatorId]);
-}
 
 module.exports = {
-    getAllRewards,
-    getRewardsByCreator,
     addCommandChannel,
     removeCommandChannel,
     getCommandChannels,

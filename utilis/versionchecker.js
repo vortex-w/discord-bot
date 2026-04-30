@@ -8,8 +8,8 @@ function fetchJson(url){
             res.on('data', chunk => data += chunk);
 
             res.on('end', () => {
-                console.log("GitHub válasz státusz:", res.statusCode);
-                console.log("GitHub válasz eleje:", data.slice(0, 100));
+                //console.log("GitHub válasz státusz:", res.statusCode);
+                //console.log("GitHub válasz eleje:", data.slice(0, 100));
 
                 if(res.statusCode !== 200){
                     return reject(new Error(`GitHub lekérés hiba: ${res.statusCode} - ${data}`));

@@ -1,4 +1,5 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+//const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { logError, logInfo } = require("../database/logger");
 const { getExpiredActiveQuizzes, closeQuizById, getQuizAnswers, getQuizVoteCounts, getCorrectVoters, addQuizPoint, addRankPoint } = require("../game/quiz_game");
 function buildDisabledButtons(quizId,answers){
@@ -41,6 +42,33 @@ async function closeExperiedQuizzes(client){
                     await closeQuizById(quiz.id);
                     continue;
                 }
+                /*bővítés*/
+
+                const perms = channel.permissionsFor(channel.guild.members.me);
+
+                if(!perms || !perms.has(PermissionFlagsBits.SendMessages)){
+                    console.log(`Nincs jog üzenetet küldeni ebbe a csatornába: ${channel.name} (${channel.id})`);
+
+                    await logError(
+                        new Error(`Missing SendMessages permission in channel ${channel.name} (${channel.id})`),
+                        `Kvíz lezárás jogosultsági hiba | quizId: ${quiz.id}`
+                    );
+
+                    continue;
+                }
+
+                if(!perms.has(PermissionFlagsBits.EmbedLinks)){
+                    console.log(`Nincs EmbedLinks jog ebben a csatornában: ${channel.name} (${channel.id})`);
+
+                    await logError(
+                        new Error(`Missing EmbedLinks permission in channel ${channel.name} (${channel.id})`),
+                        `Kvíz lezárás embed jogosultsági hiba | quizId: ${quiz.id}`
+                    );
+
+                    continue;
+                }
+
+                /*bővités vége */
                  const message = await channel.messages.fetch(quiz.message_id).catch(() => null);
                  const answers = await getQuizAnswers(quiz.id);
                  const voteCounts = await getQuizVoteCounts(quiz.id);

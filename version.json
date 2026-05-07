@@ -1,9 +1,5 @@
 {
-    "version": "V1.0.8",
-<<<<<<< HEAD
-    "updated_at": "2026-05-07T13:52:01.451Z",
-=======
-    "updated_at": "2026-05-07T13:51:32.790Z",
->>>>>>> 47b79ddf52576773963c91f37b2ea8894846167a
-    "message": "V1.0.8\n\nbiztonsági mentés"
+    "version": "V1.0.10",
+    "updated_at": "2026-05-07T14:20:47.876Z",
+    "message": "V1.0.10 játék módosítás. több kép lehetőség"
 }

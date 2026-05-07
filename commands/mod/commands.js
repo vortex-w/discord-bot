@@ -149,13 +149,15 @@ module.exports = [
             }
 
             if (message.attachments.size === 0) {
-                return targetChannel.send("Csatolj egy képet a kvízhez.");
+                return targetChannel.send("Csatolj legalább egy képet a kvízhez.");
             }
 
-            const attachment = message.attachments.first();
+            const imageAttachments = [...message.attachments.values()].filter(att => {
+                return att.contentType && att.contentType.startsWith("image");
+            });
 
-            if (!attachment.contentType || !attachment.contentType.startsWith("image")) {
-                return targetChannel.send("A csatolmány nem kép.");
+            if (imageAttachments.length === 0) {
+                return targetChannel.send("Legalább egy csatolmány kép legyen.");
             }
 
             const endTimeSql = formatDateTime(endTime);
@@ -199,7 +201,7 @@ module.exports = [
                         { name: 'Lejárat', value: endTimeSql.slice(0, 16), inline: false },
                         { name: 'indította', value: message.author.username, inline: false }
                     )
-                    .setImage(`attachment://${attachment.name}`)
+                    .setImage(`attachment://${imageAttachments[0].name}`)
                     .setFooter({ text: `quiz ID: ${quizId}` });
 
                 const components = buildAnswerButtons(quizId, answers);
@@ -207,12 +209,10 @@ module.exports = [
                 const botQuizMessage = await targetChannel.send({
                     embeds: [embed],
                     components: components,
-                    files: [
-                        {
-                            attachment: attachment.url,
-                            name: attachment.name
-                        }
-                    ]
+                    files: imageAttachments.map(att => ({
+                        attachment: att.url,
+                        name: att.name
+                    }))
                 });
 
                 await updateQuizMessageId(quizId, botQuizMessage.id);

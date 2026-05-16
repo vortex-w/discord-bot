@@ -1,5 +1,5 @@
 {
-    "version": "V1.1.0",
-    "updated_at": "2026-05-16T15:15:33.223Z",
-    "message": "V1.1.0\n\nQuiz-game frissítése, több kép lehetőség optimalizálása"
+    "version": "V1.1.1",
+    "updated_at": "2026-05-16T15:27:12.432Z",
+    "message": "V1.1.1\n\nFelesleges file-ok törlése.\nnagyobb frissítések korábbról:\nkvíz játék több képes felismerése.\nREADME file hozzá adása.\n\negyéb:\nTesztelés a githubról való letöltés során."
 }

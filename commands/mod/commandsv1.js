@@ -1,3 +1,5 @@
+const { permission } = require("node:process");
+const { getGuildRoles, setRolePermission } = require("../../database/guildRoles");
 const { getCommandTargetChannel } = require('../../utilis/commandTargetChannel');
 
 const {
@@ -11,16 +13,13 @@ const {
     getUserPoints,
     removeQuizPoint
 } = require("../../game/quiz_game");
-
 const { logError, logInfo } = require("../../database/logger");
-
 const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder
 } = require('discord.js');
-
 const { getCommandChannels } = require("../../database/queries/commandChannels");
 const { createReward, deleteReward, getRewardById } = require("../../database/queries/rewardsjs");
 const { isAdmin } = require("../../utilis/permissions");
@@ -161,8 +160,6 @@ module.exports = [
                 return targetChannel.send("Legalább egy csatolmány kép legyen.");
             }
 
-            const limitedImages = imageAttachments.slice(0, 10);
-
             const endTimeSql = formatDateTime(endTime);
             const createdAtSql = formatDateTime(new Date());
 
@@ -197,49 +194,32 @@ module.exports = [
                     });
                 }
 
-                const embeds = [];
-
-                const mainEmbed = new EmbedBuilder()
+                const embed = new EmbedBuilder()
                     .setTitle('quiz Játék')
                     .setDescription(`**Kérdés:**\n**${question}**`)
                     .addFields(
                         { name: 'Lejárat', value: endTimeSql.slice(0, 16), inline: false },
                         { name: 'indította', value: message.author.username, inline: false }
                     )
-                    .setImage(`attachment://${limitedImages[0].name}`)
+                    .setImage(`attachment://${imageAttachments[0].name}`)
                     .setFooter({ text: `quiz ID: ${quizId}` });
-
-                embeds.push(mainEmbed);
-
-                for (let i = 1; i < limitedImages.length; i++) {
-                    embeds.push(
-                        new EmbedBuilder()
-                            .setImage(`attachment://${limitedImages[i].name}`)
-                    );
-                }
 
                 const components = buildAnswerButtons(quizId, answers);
 
                 const botQuizMessage = await targetChannel.send({
-                    embeds: embeds,
+                    embeds: [embed],
                     components: components,
-                    files: limitedImages.map(att => ({
+                    files: imageAttachments.map(att => ({
                         attachment: att.url,
                         name: att.name
                     }))
                 });
 
                 await updateQuizMessageId(quizId, botQuizMessage.id);
-
-                await logInfo(
-                    `Bot létrehozta a kvíz játékot id:${quizId}: ${message.author.username}`,
-                    'info'
-                );
+                logInfo(`Bot létre hozta a kvíz játékot id:${quizId}: ${message.author.username}`, 'info');
 
             } catch (error) {
-                console.error("Hiba a játék létrehozása közben:", error);
-                await logError(error, 'Hiba a játék létrehozása közben');
-                return targetChannel.send("Hiba történt a kvíz létrehozása közben.");
+                logError(error, 'Hiba a játék létre hozása közben');
             }
         }
     },
@@ -259,7 +239,7 @@ module.exports = [
 
                 if (mode === 'all') {
                     await deleteAllQuizGames();
-                    await logInfo(`A bot törölte az összes kvíz játék elemet. Törlő: ${message.author.username}`, 'info');
+                    logInfo(`A bot törölte az összes kvíz játék elemet. Törlő: ${message.author.username}`, 'info');
                     return targetChannel.send("Az összes quiz törölve lett.");
                 }
 
@@ -271,8 +251,8 @@ module.exports = [
                     }
 
                     await deleteQuizGameById(lastQuiz.id);
-                    await logInfo(`Bot törölte a legutóbbi kvíz játékot id:${lastQuiz.id} törlő: ${message.author.username}`, 'info');
-                    return targetChannel.send(`A legutóbbi quiz törölve lett. ID: ${lastQuiz.id}`);
+                    logInfo(`Bot törölte a legutóbbi kvíz játékot id:${lastQuiz.id} törlő: ${message.author.username}`, 'info');
+                    return targetChannel.send(`A legutóbbi quiz törölve lett . ID: ${lastQuiz.id}`);
                 }
 
                 const quizId = parseInt(mode, 10);
@@ -282,19 +262,17 @@ module.exports = [
                 }
 
                 await deleteQuizGameById(quizId);
-                await logInfo(`A bot törölte a ${quizId} elemű kvíz játékot. Törlő: ${message.author.username}`, 'info');
+                logInfo(`A bot törölte a ${quizId} elemű kvíz játékot. Törlő: ${message.author.username}`, 'info');
                 return targetChannel.send(`Quiz törölve. ID: ${quizId}`);
 
             } catch (error) {
-                console.error("Hiba a quiz törlése közben:", error);
-                await logError(error, 'Hiba a quiz törlése közben.');
-                return targetChannel.send("Hiba történt a quiz törlése közben.");
+                logError(error, 'Hiba a quiz törlése közben.');
             }
         }
     },
     {
         name: 'listpoint',
-        description: 'kilistázza a játékosok pontjait, vagy egy adott játékosét. Használata: !listpoint [all, @user]',
+        description: 'ki listázza a játékosok pontjait, vagy egy adott játékosét. Használata: !listpoint [all, @user]',
         permissionLevel: 'mod',
 
         async prefix(message, args) {
@@ -308,11 +286,11 @@ module.exports = [
                 const rows = await getAllUserPoints(message.guild.id);
 
                 if (!rows || rows.length === 0) {
-                    return targetChannel.send("Nincs még pont a szerveren.");
+                    return targetChannel.send("Használat: !listpoint [all | @user]");
                 }
 
                 const text = rows
-                    .map((row, index) => `${index + 1}. ${row.user_name} --> ${row.total} pont`)
+                    .map((row, index) => `${index + 1}.${row.user_name} --> ${row.total} pont`)
                     .join("\n");
 
                 return targetChannel.send(`🏆 Pontlista:\n${text}`);
@@ -386,7 +364,6 @@ module.exports = [
             }
 
             let amount = 1;
-
             if (amountRaw !== undefined) {
                 amount = parseInt(amountRaw, 10);
             }
@@ -395,8 +372,11 @@ module.exports = [
                 return targetChannel.send('A mennyiség legalább 1 legyen.');
             }
 
-            const targetUser = await message.client.users.fetch(targetUserId).catch(() => null);
-            const creatorUser = await message.client.users.fetch(creatorUserId).catch(() => null);
+            const targetUser =
+                await message.client.users.fetch(targetUserId).catch(() => null);
+
+            const creatorUser =
+                await message.client.users.fetch(creatorUserId).catch(() => null);
 
             if (!targetUser) {
                 return targetChannel.send('A cél felhasználó nem található.');

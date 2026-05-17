@@ -324,7 +324,7 @@ module.exports = [
                 return targetChannel.send("Adj meg egy felhasználót: !listpoint @user");
             }
 
-            const rows = await getUserPoints(user.id);
+            const rows = await getUserPoints(message.guild.id, userId);
 
             if (!rows || rows.length === 0) {
                 return targetChannel.send(`${user.username}-nek még nincs pontja.`);

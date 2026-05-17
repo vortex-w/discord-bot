@@ -205,17 +205,19 @@ async function getCorrectVoters(quizId){
 }
 
 
-async function getUserPoints(userId){
+async function getUserPoints(guildId, userId){
     const rows = await all(`
         SELECT 
-            u.username as created_by,
+            COALESCE(u.global_name, u.username, qp.created_id) as created_by,
             SUM(qp.points) as total
         FROM quiz_points qp
         LEFT JOIN users u
             ON qp.created_id = u.user_id
-        WHERE qp.user_id = ?
+        WHERE qp.guild_id = ?
+        AND qp.user_id = ?
         GROUP BY qp.created_id
-    `,[userId]);
+        ORDER BY total DESC
+    `,[guildId, userId]);
 
     return rows;
 }

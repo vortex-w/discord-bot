@@ -1,5 +1,5 @@
 {
-    "version": "V1.1.2",
-    "updated_at": "2026-05-16T16:05:09.748Z",
-    "message": "V1.1.2\n\nEnv file javítása\n.env.example hozzáadása."
+    "version": "V1.1.3",
+    "updated_at": "2026-05-17T05:49:13.604Z",
+    "message": "V1.1.3\n\nPont lekérdezés javítása.\nváltoztatott kódok:\ngame/quiz_game.js\ncommands/public/commands.js\ncommands/mod/commands.js"
 }

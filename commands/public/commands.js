@@ -281,7 +281,8 @@ module.exports = [
             const targetChannel = await getCommandTargetChannel(message, 'mypoints');
             const userId = message.author.id;
 
-            const rows = await getUserPoints(userId);
+            
+            const rows = await getUserPoints(message.guild.id, user.id);
 
             if (!rows || rows.length === 0) {
                 return targetChannel.send(`${message.author.username}-nek még nincs pontja.`);

@@ -1,5 +1,6 @@
 const { getCommandTargetChannel } = require('../../utilis/commandTargetChannel');
 
+
 const {
     createQuizGame,
     createQuizAnswer,
@@ -324,7 +325,7 @@ module.exports = [
                 return targetChannel.send("Adj meg egy felhasználót: !listpoint @user");
             }
 
-            const rows = await getUserPoints(message.guild.id, userId);
+            const rows = await getUserPoints(message.guild.id, user.id);
 
             if (!rows || rows.length === 0) {
                 return targetChannel.send(`${user.username}-nek még nincs pontja.`);

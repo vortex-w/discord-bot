@@ -1,5 +1,5 @@
 {
-    "version": "V1.1.4",
-    "updated_at": "2026-09-16T21:03:51.655Z",
-    "message": "v1.1.4\n\nParancs javítás\nMypoints userid javítása"
+    "version": "V1.2.0",
+    "updated_at": "2026-09-16T21:54:06.626Z",
+    "message": "V1.2.0\n\nLoglist parancs teljes javítása.\nMegfelelő lekérdezési parancsok.\nSzerverhez rendelt lekérdezések.\nmódosult:\ncommands/admin/commands\ndatabase/logger.js\ndeploy-commands.js\nelőző verzió file módosításai:\ncommands/mod/commands.js\ncommands/public/commands.js\nversion.json"
 }

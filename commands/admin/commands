@@ -4,11 +4,18 @@
 //Admin parancsok
 const { getGuildRoles, setRolePermission, setUserCommandPermission, getUserCommandPermission } = require('../../database/guildRoles');
 const { getGuildChannels, getGuildChannelByName } = require('../../database/queries/guildChannels');
-const { logInfo, logError, logWarn, getLogsBetween ,  deleteAllLogs,
+const {
+    logInfo,
+    logError,
+    logWarn,
+    getLogsBetween,
+    deleteAllLogs,
     deleteLastLog,
     deleteLogsByDate,
     getLastLog,
-    getLogsByDate} = require('../../database/logger');
+    getLogsByDate,
+    countLogsBetween
+} = require('../../database/logger');
 const {addCommandChannel, getAllCommandChannelRules, getCommandChannels, removeCommandChannel} = require( '../../database/queries/commandChannels');
 const {getCommandTargetChannel} = require('../../utilis/commandTargetChannel');
 const { 
@@ -67,83 +74,362 @@ module.exports = [
     },
     {
         name: 'loglist',
-        description: 'Dátumon belül ki listáza a log eredményeit.',
+        description: 'Kilistázza a szerver logjait dátum és típus szerint.',
         permissionLevel: 'admin',
-        async prefix(message, args){
-            const targetChannel = await getCommandTargetChannel(message, 'loglist');
 
-            let start = "";
-            let end = "";
+        slashOptions: [
+            {
+                name: 'start',
+                description: 'Kezdő dátum ÉÉÉÉ-HH-NN formátumban',
+                required: false
+            },
+            {
+                name: 'end',
+                description: 'Záró dátum ÉÉÉÉ-HH-NN formátumban',
+                required: false
+            },
+            {
+                name: 'type',
+                description: 'Log típusa',
+                required: false,
+                choices: [
+                    {
+                        name: 'Hiba',
+                        value: 'error'
+                    },
+                    {
+                        name: 'Figyelmeztetés',
+                        value: 'warn'
+                    },
+                    {
+                        name: 'Információ',
+                        value: 'info'
+                    }
+                ]
+            }
+        ],
 
-            if(!args[0]){
-                await targetChannel.send("Használat: !loglist 2026-03-08 vagy !loglist 2026-03-07 2026-03-08");
-                return;
+        async getLogList(guildId, inputArgs = []) {
+            const args = [...inputArgs];
+
+            const allowedTypes = [
+                'error',
+                'warn',
+                'info'
+            ];
+
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+            let type = null;
+            let start = '0000-01-01 00:00:00';
+            let end = '9999-12-31 23:59:59';
+            let periodText = 'legutóbbi logok';
+
+            /*
+            * Ha az utolsó paraméter egy logtípus,
+            * levesszük a dátumok közül.
+            */
+            if (
+                args.length > 0 &&
+                allowedTypes.includes(
+                    args[args.length - 1].toLowerCase()
+                )
+            ) {
+                type = args.pop().toLowerCase();
             }
 
-            if(!args[1]){
-                start = args[0] + " 00:00:00";
-                end = args[0] + " 23:59:59";
-            }else if(!args[2]){
-                start = args[0] + " " + args[1];
-                end = args[0] + " 23:59:59";
-            }
-            else if(!args[3]){
-                start = args[0] + " " + args[1];
-                end = args[2] + " 23:59:59";
-            }else {
-                start = args[0] + " " + args[1];
-                end = args[2] + " " + args[3];
-            }
+            /*
+            * Egyetlen dátum:
+            * !loglist 2026-09-16
+            */
+            if (args.length === 1) {
+                if (!dateRegex.test(args[0])) {
+                    return {
+                        error:
+                            'Hibás dátumformátum.\n' +
+                            'Helyes példa: !loglist 2026-09-16'
+                    };
+                }
 
-            const logs = await getLogsBetween(start,end);
-
-            if(!logs.length){
-                await targetChannel.send("nincs log ebben az időszakban");
-                return;
+                start = `${args[0]} 00:00:00`;
+                end = `${args[0]} 23:59:59`;
+                periodText = args[0];
             }
 
-            let text = "logok: \n\n";
-            for(const log of logs.slice(0,10)){
-                text += `[${log.created_at}]${log.type} - ${log.message}\n`;
+            /*
+            * Két dátum:
+            * !loglist 2026-09-15 2026-09-16
+            */
+            if (args.length === 2) {
+                if (
+                    !dateRegex.test(args[0]) ||
+                    !dateRegex.test(args[1])
+                ) {
+                    return {
+                        error:
+                            'Hibás dátumformátum.\n' +
+                            'Helyes példa: ' +
+                            '!loglist 2026-09-15 2026-09-16'
+                    };
+                }
+
+                if (args[0] > args[1]) {
+                    return {
+                        error:
+                            'A kezdő dátum nem lehet későbbi, ' +
+                            'mint a záró dátum.'
+                    };
+                }
+
+                start = `${args[0]} 00:00:00`;
+                end = `${args[1]} 23:59:59`;
+                periodText = `${args[0]} – ${args[1]}`;
             }
 
-            await targetChannel.send("```"+text+"```");
+            /*
+            * Kettőnél több dátumparaméter nem megengedett.
+            */
+            if (args.length > 2) {
+                return {
+                    error:
+                        'Hibás használat.\n\n' +
+                        'Példák:\n' +
+                        '!loglist\n' +
+                        '!loglist 2026-09-16\n' +
+                        '!loglist 2026-09-15 2026-09-16\n' +
+                        '!loglist 2026-09-16 error\n' +
+                        '!loglist 2026-09-15 2026-09-16 warn'
+                };
+            }
+
+            const logs = await getLogsBetween(
+                guildId,
+                start,
+                end,
+                type,
+                10,
+                0
+            );
+
+            const total = await countLogsBetween(
+                guildId,
+                start,
+                end,
+                type
+            );
+
+            if (!logs || logs.length === 0) {
+                return {
+                    error:
+                        'Nincs log a megadott időszakban' +
+                        `${type ? ` (${type})` : ''}.`
+                };
+            }
+
+            let text =
+                `Logok – ${periodText}\n` +
+                `${type ? `Típus: ${type}\n` : ''}` +
+                `Megjelenítve: ${logs.length}/${total}\n\n`;
+
+            for (const log of logs) {
+                const userName =
+                    log.user_name || 'nincs megadva';
+
+                const userId =
+                    log.user_id
+                        ? ` (${log.user_id})`
+                        : '';
+
+                const message = String(log.message || '')
+                    .replace(/```/g, "'''");
+
+                text +=
+                    `#${log.id} ` +
+                    `[${log.created_at}] ` +
+                    `${String(log.type).toUpperCase()}\n` +
+                    `Felhasználó: ${userName}${userId}\n` +
+                    `Üzenet: ${message}\n\n`;
+            }
+
+            /*
+            * A Discord maximum 2000 karaktert enged.
+            * A válaszokat 1900 karakteres részekre bontjuk.
+            */
+            const chunks = [];
+
+            while (text.length > 1900) {
+                let cutPosition = text.lastIndexOf(
+                    '\n\n',
+                    1900
+                );
+
+                if (cutPosition <= 0) {
+                    cutPosition = 1900;
+                }
+
+                chunks.push(
+                    text.slice(0, cutPosition)
+                );
+
+                text = text
+                    .slice(cutPosition)
+                    .trim();
+            }
+
+            if (text.length > 0) {
+                chunks.push(text);
+            }
+
+            return {
+                chunks
+            };
         },
-        async slash(interaction){
-            const startDate = interaction.options.getString('start');
-            const endDate = interaction.options.getString('end') || startDate;
 
-            if(!startDate){
+        async prefix(message, args) {
+            const targetChannel =
+                await getCommandTargetChannel(
+                    message,
+                    'loglist'
+                );
+
+            try {
+                const result = await this.getLogList(
+                    message.guild.id,
+                    args
+                );
+
+                if (result.error) {
+                    return targetChannel.send(
+                        result.error
+                    );
+                }
+
+                for (const chunk of result.chunks) {
+                    await targetChannel.send(
+                        '```\n' +
+                        chunk +
+                        '\n```'
+                    );
+                }
+
+            } catch (error) {
+                console.error(
+                    'Hiba a loglist parancsnál:',
+                    error
+                );
+
+                await logError(
+                    error,
+                    'Hiba a loglist parancsnál',
+                    {
+                        user_id: message.author.id,
+                        user_name: message.author.username,
+                        guild_id: message.guild.id,
+                        guild_name: message.guild.name
+                    }
+                );
+
+                await targetChannel.send(
+                    'Hiba történt a logok lekérdezése közben.'
+                );
+            }
+        },
+
+        async slash(interaction) {
+            try {
+                const startDate =
+                    interaction.options.getString('start');
+
+                const endDate =
+                    interaction.options.getString('end');
+
+                const type =
+                    interaction.options.getString('type');
+
+                if (endDate && !startDate) {
+                    return interaction.reply({
+                        content:
+                            'Záró dátum csak kezdő dátummal ' +
+                            'együtt adható meg.',
+                        ephemeral: true
+                    });
+                }
+
+                const args = [];
+
+                if (startDate) {
+                    args.push(startDate);
+                }
+
+                if (endDate) {
+                    args.push(endDate);
+                }
+
+                if (type) {
+                    args.push(type);
+                }
+
+                const result = await this.getLogList(
+                    interaction.guild.id,
+                    args
+                );
+
+                if (result.error) {
+                    return interaction.reply({
+                        content: result.error,
+                        ephemeral: true
+                    });
+                }
+
                 await interaction.reply({
-                    content: 'Adj meg egy dátumot. Példa: 2026-03-08 és a !loglist parancsot használd!',
+                    content:
+                        '```\n' +
+                        result.chunks[0] +
+                        '\n```',
                     ephemeral: true
                 });
-                return;
+
+                for (
+                    const chunk of result.chunks.slice(1)
+                ) {
+                    await interaction.followUp({
+                        content:
+                            '```\n' +
+                            chunk +
+                            '\n```',
+                        ephemeral: true
+                    });
+                }
+
+            } catch (error) {
+                console.error(
+                    'Hiba a loglist slash parancsnál:',
+                    error
+                );
+
+                await logError(
+                    error,
+                    'Hiba a loglist slash parancsnál',
+                    {
+                        user_id: interaction.user.id,
+                        user_name: interaction.user.username,
+                        guild_id: interaction.guild.id,
+                        guild_name: interaction.guild.name
+                    }
+                );
+
+                if (
+                    !interaction.replied &&
+                    !interaction.deferred
+                ) {
+                    await interaction.reply({
+                        content:
+                            'Hiba történt a logok ' +
+                            'lekérdezése közben.',
+                        ephemeral: true
+                    });
+                }
             }
-
-            const start = startDate + " 00:00:00";
-            const end = endDate + " 23:59:59";
-
-            const logs = await getLogsBetween(start,end);
-
-            if(!logs.length){
-                await interaction.reply({
-                    content: "Nincs log ebben az időszakban.",
-                    ephemeral: true
-                });
-                return;
-            }
-
-            let text = "Logok:\n\n";
-
-            for(const log of logs.slice(0,10)){
-                text += `[${log.created_at}] ${log.type} - ${log.message}\n`;
-            }
-
-            await interaction.reply({
-                content: "```"+text+"```",
-                ephemeral: true
-            });
         }
     },
     {

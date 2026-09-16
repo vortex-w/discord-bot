@@ -1,12 +1,22 @@
-
 require('dotenv').config();
 
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
+const {
+    REST,
+    Routes,
+    SlashCommandBuilder
+} = require('discord.js');
 
-const publicCommands = require('./commands/public/commands');
-const modCommands = require('./commands/mod/commands');
-const adminCommands = require('./commands/admin/commands');
-const ownerCommands = require('./commands/owner/commands');
+const publicCommands =
+    require('./commands/public/commands');
+
+const modCommands =
+    require('./commands/mod/commands');
+
+const adminCommands =
+    require('./commands/admin/commands');
+
+const ownerCommands =
+    require('./commands/owner/commands');
 
 const allCommands = [
     ...publicCommands,
@@ -19,33 +29,94 @@ const commands = [];
 
 for (const command of allCommands) {
     if (!command.name || !command.description) {
-        console.log('Találtam egy hibás slash parancsot, hiányzik a name vagy description mező.');
+        console.log(
+            'Találtam egy hibás slash parancsot, ' +
+            'hiányzik a name vagy description mező.'
+        );
+
         continue;
+    }
+    /*
+    * A Discord legfeljebb 100 karakteres
+    * slash-parancs-leírást engedélyez.
+    */
+    const commandDescription =
+        command.description.length > 100
+            ? command.description.slice(0, 97) + '...'
+            : command.description;
+
+    const builder = new SlashCommandBuilder()
+        .setName(command.name)
+        .setDescription(commandDescription);
+
+    /*
+     * Ha a parancshoz vannak slash opciók,
+     * hozzáadjuk azokat a Discord-parancshoz.
+     */
+    for (
+        const option of command.slashOptions || []
+    ) {
+        builder.addStringOption(
+            stringOption => {
+                stringOption
+                    .setName(option.name)
+                    .setDescription(option.description)
+                    .setRequired(
+                        Boolean(option.required)
+                    );
+
+                /*
+                 * Például a loglist type mezőjénél
+                 * error, warn és info választható.
+                 */
+                if (
+                    option.choices &&
+                    option.choices.length > 0
+                ) {
+                    stringOption.addChoices(
+                        ...option.choices
+                    );
+                }
+
+                return stringOption;
+            }
+        );
     }
 
     commands.push(
-        new SlashCommandBuilder()
-            .setName(command.name)
-            .setDescription(command.description)
-            .toJSON()
+        builder.toJSON()
     );
 }
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({
+    version: '10'
+}).setToken(
+    process.env.DISCORD_TOKEN
+);
 
 const clientId = '1479791177527201916';
 const guildId = '1263387085872562186';
 
 (async () => {
     try {
-        console.log('Slash parancsok regisztrálása...');
-
-        await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
-            { body: commands }
+        console.log(
+            'Slash parancsok regisztrálása...'
         );
 
-        console.log('Sikeresen regisztrált parancsok.');
+        await rest.put(
+            Routes.applicationGuildCommands(
+                clientId,
+                guildId
+            ),
+            {
+                body: commands
+            }
+        );
+
+        console.log(
+            'Sikeresen regisztrált parancsok.'
+        );
+
     } catch (error) {
         console.error(error);
     }

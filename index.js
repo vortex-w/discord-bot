@@ -1,7 +1,12 @@
 
  require('dotenv').config();
 var teszt_mode = false;
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const {
+    Client,
+    GatewayIntentBits,
+    Collection,
+    Partials
+} = require('discord.js');
 const { canUseLevel, getNoPermissionMessage } = require('./utilis/permissions');
 const { syncGuildChannels } = require('./utilis/syncGuildChannels');
 const {initDatabase} = require('./database/init');
@@ -10,12 +15,22 @@ const {saveGuild, saveGuildUser} = require('./database/queries/guilds');
 const kopapirollo = require('./game/kopapirollo');
 const {logError, logInfo, logWarn, getLogsBetween} = require('./database/logger');
 const { createGuildRolesTable,syncGuildRoles }  = require('./database/guildRoles');
+const {
+    saveFaqMessage,
+    removeFaqMessage
+} = require('./utilis/faqSync');
+
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
+    ],
+
+    partials: [
+        Partials.Channel,
+        Partials.Message
     ]
 });
 
@@ -32,11 +47,14 @@ const { getCommandChannels } = require('./database/queries/commandChannels');
 const { getOrCreateBotVersion, updateBotVersionCheck, updateBotVersionNotify } = require('./database/queries/botVersion');
 const { compareVersions } = require('./utilis/versionCompare');
 const { getGithubVersion } = require('./utilis/versionchecker');
+const adminFaqCommands = require('./commands/admin/faqCommands');
+
 
 const allCommands = [
     ...publicCommands,
     ...modCommands,
     ...adminCommands,
+    ...adminFaqCommands,
     ...ownerCommands
 ];
 
@@ -255,6 +273,125 @@ client.once('clientReady', async () => {
         }
     });
     //await checkBotVersions(client);
+});
+
+/*
+ * Új üzenet automatikus mentése, ha az a
+ * beállított GYIK-csatornába érkezett.
+ */
+client.on('messageCreate', async message => {
+    try {
+        /*
+         * A saját bot válaszait nem tesszük
+         * bele a GYIK-keresőbe.
+         *
+         * Más botok hasznos embedjei bekerülhetnek.
+         */
+        if (
+            client.user &&
+            message.author.id === client.user.id
+        ) {
+            return;
+        }
+
+        await saveFaqMessage(message);
+
+    } catch (error) {
+        console.error(
+            'GYIK messageCreate szinkronizálási hiba:',
+            error
+        );
+
+        await logError(
+            error,
+            'GYIK messageCreate szinkronizálási hiba',
+            {
+                user_id:
+                    message.author?.id || null,
+
+                user_name:
+                    message.author?.username || null,
+
+                guild_id:
+                    message.guild?.id || null,
+
+                guild_name:
+                    message.guild?.name || null
+            }
+        );
+    }
+});
+
+/*
+ * Szerkesztett GYIK-üzenet frissítése.
+ */
+client.on(
+    'messageUpdate',
+    async (oldMessage, newMessage) => {
+        try {
+            if (
+                client.user &&
+                newMessage.author?.id ===
+                    client.user.id
+            ) {
+                return;
+            }
+
+            await saveFaqMessage(newMessage);
+
+        } catch (error) {
+            console.error(
+                'GYIK messageUpdate szinkronizálási hiba:',
+                error
+            );
+
+            await logError(
+                error,
+                'GYIK messageUpdate szinkronizálási hiba',
+                {
+                    user_id:
+                        newMessage.author?.id || null,
+
+                    user_name:
+                        newMessage.author?.username || null,
+
+                    guild_id:
+                        newMessage.guild?.id || null,
+
+                    guild_name:
+                        newMessage.guild?.name || null
+                }
+            );
+        }
+    }
+);
+
+/*
+ * Törölt GYIK-üzenet eltávolítása
+ * a keresési adatbázisból.
+ */
+client.on('messageDelete', async message => {
+    try {
+        await removeFaqMessage(message);
+
+    } catch (error) {
+        console.error(
+            'GYIK messageDelete szinkronizálási hiba:',
+            error
+        );
+
+        await logError(
+            error,
+            'GYIK messageDelete szinkronizálási hiba',
+            {
+                guild_id:
+                    message.guild?.id || null,
+
+                guild_name:
+                    message.guild?.name || null
+            }
+        );
+    }
 });
 
 client.on('messageCreate', async (message) => {

@@ -1,5 +1,5 @@
 {
-    "version": "V1.2.0",
-    "updated_at": "2026-09-16T21:54:06.626Z",
-    "message": "V1.2.0\n\nLoglist parancs teljes javítása.\nMegfelelő lekérdezési parancsok.\nSzerverhez rendelt lekérdezések.\nmódosult:\ncommands/admin/commands\ndatabase/logger.js\ndeploy-commands.js\nelőző verzió file módosításai:\ncommands/mod/commands.js\ncommands/public/commands.js\nversion.json"
+    "version": "V1.3.0",
+    "updated_at": "2026-09-17T10:58:32.842Z",
+    "message": "V1.3.0\n\nGYIK keresőrendszer hozzáadása. Szerverenként beállítható GYIK-csatorna és címformátum. A GYIK-bejegyzések automatikus szinkronizálása az adatbázissal új üzenet, módosítás és törlés esetén. Keresés a bejegyzések címében és tartalmában, beleértve a cím nélküli üzeneteket is. A találatok az eredeti Discord-üzenetre mutató hivatkozást tartalmaznak. A keresés kizárólag az adott szerverhez tartozó GYIK-bejegyzéseket jeleníti meg.\n\nÚj fájlok:\ndatabase/queries/faq.js\nutilis/faqParser.js\nutilis/faqSync.js\ncommands/admin/faqCommands.js\n\nMódosult fájlok:\ndatabase/init.js\ncommands/public/commands.js\nindex.js\ndeploy-commands.js\n\nElőző verzió módosításai:\nLoglist parancs teljes javítása. Megfelelő lekérdezési parancsok. Szerverhez rendelt lekérdezések. Módosult: commands/admin/commands, database/logger.js, deploy-commands.js. Előző verzió fájlmódosításai: commands/mod/commands.js, commands/public/commands.js, version.json."
 }
